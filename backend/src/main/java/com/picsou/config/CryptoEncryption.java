@@ -33,7 +33,11 @@ public class CryptoEncryption {
     }
 
     public String encrypt(String plainText) {
-        if (plainText == null || key == null) return plainText;
+        if (plainText == null) return null;
+        if (key == null) throw new IllegalStateException(
+                "CRYPTO_ENCRYPTION_KEY is not set — cannot store exchange credentials. " +
+                "Set app.crypto.encryption-key in your environment.");
+
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
             random.nextBytes(iv);

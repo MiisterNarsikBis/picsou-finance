@@ -238,8 +238,10 @@ public class TradeRepublicAdapter implements TradeRepublicPort {
                                                     positionsByIsin.put(isin, pos);
                                                     int tid = subIdCounter.incrementAndGet();
                                                     tickerSubToIsin.put(tid, isin);
+                                                    String exchangeId = pos.path("exchangeId").asText("");
+                                                    String tickerId = isin + (exchangeId.isEmpty() ? ".TRX" : "." + exchangeId);
                                                     tickerMsgs.add(subWithId(tid, "ticker",
-                                                            isin + ".LSX", sessionToken));
+                                                            tickerId, sessionToken));
                                                 }
                                             }
                                             int prev = expectedTickers.get();
