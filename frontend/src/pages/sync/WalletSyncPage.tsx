@@ -7,7 +7,7 @@ import { RefreshCw, Trash2, Loader2, CheckCircle2, Plus } from 'lucide-react'
 const CHAINS: { value: ChainType; label: string; placeholder: string }[] = [
   { value: 'SOLANA', label: 'Solana', placeholder: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU' },
   { value: 'ETHEREUM', label: 'Ethereum', placeholder: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18' },
-  { value: 'BITCOIN', label: 'Bitcoin', placeholder: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh' },
+  { value: 'BITCOIN', label: 'Bitcoin', placeholder: 'bc1q... ou xpub... ou zpub... ou wpkh([...])' },
 ]
 
 function formatEur(amount: number) {
@@ -155,6 +155,11 @@ export function WalletSyncPage() {
               onChange={e => setAddress(e.target.value)}
               className="px-3 py-2 border border-gray-200 rounded-[10px] text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900/20"
             />
+            {chain === 'BITCOIN' && (
+              <p className="text-gray-400" style={{ fontSize: 11 }}>
+                Accepte une adresse simple, un xpub/zpub ou un descripteur Proton Wallet (wpkh([…]xpub…/0/*)#…)
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
