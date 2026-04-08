@@ -81,3 +81,10 @@ Logged at WARN level so upstream flakiness is trackable without alert fatigue.
 1. Extend `RuntimeException` directly (no base class).
 2. Add a handler method in `GlobalExceptionHandler` returning `ProblemDetail`.
 3. Throw it from a service — never from a controller.
+
+## Don'ts
+
+- **Never catch exceptions in controllers** — let `GlobalExceptionHandler` handle them.
+- **Never create an `AppException` base class** — each exception type extends `RuntimeException` directly.
+- **Never expose stack traces to clients** — the generic 500 handler returns "An unexpected error occurred".
+- **Never throw business exceptions from adapters** — wrap external errors in `SyncException`.

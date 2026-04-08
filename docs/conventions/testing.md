@@ -104,3 +104,11 @@ Only `GoalServiceTest` exists currently. As the codebase grows, prioritize:
 1. **Service-layer unit tests** — mock dependencies, test business logic.
 2. **Repository custom queries** — `@DataJpaTest` for non-trivial JPQL.
 3. **Controller integration tests** — MockMvc only when auth or validation flow needs verification.
+
+## Don'ts
+
+- **Never load Spring context in unit tests** — pure Mockito. Use `@DataJpaTest` only for JPA integration tests.
+- **Never use `MockitoAnnotations.openMocks()`** — use `@ExtendWith(MockitoExtension.class)`.
+- **Never use JUnit `assertEquals`** — always AssertJ (`assertThat`).
+- **Never use `@Autowired` in tests** unless it's a `@DataJpaTest` integration test.
+- **Never create test fixtures or "mother objects"** — use Lombok builders directly.

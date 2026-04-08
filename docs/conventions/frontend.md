@@ -131,6 +131,21 @@ const DashboardPage = lazy(() =>
 
 Components in `components/ui/` are **generated** — never edit them directly. Customize via the shadcn CLI or Tailwind theme tokens.
 
+#### Color tokens — always semantic, never raw palette
+
+`shadcn/tailwind.css` remaps Tailwind's `gray` palette to a blue-tinted scale aligned with the primary hue. **Never use raw palette classes** (`text-gray-*`, `bg-gray-*`, etc.) — they will appear blue, not neutral.
+
+| Intent | Use |
+|--------|-----|
+| Primary text | `text-foreground` |
+| Muted / secondary text | `text-muted-foreground` |
+| Subtle background | `bg-muted` |
+| Card background | `bg-card` |
+| Primary action color | `text-primary` / `bg-primary` |
+| Destructive / error | `text-destructive` |
+
+**Exception:** intentional status colors (`text-green-*`, `text-red-*`, `text-amber-*`, etc.) are fine when used as semantic UI signals (sync status badges, financial gain/loss indicators). Always include dark-mode variants or use the `dark:` prefix for those.
+
 ### Icons
 
 Use `HugeiconsIcon` from `@hugeicons/react` with icons from `@hugeicons/core-free-icons`. No other icon libraries.
@@ -162,3 +177,14 @@ bun run format       # Prettier
 bun run test:e2e     # Playwright E2E tests
 npx vitest run       # Vitest unit tests
 ```
+
+## Don'ts
+
+- **Never use raw palette classes** (`text-gray-*`, `bg-gray-*`) — always semantic tokens (`text-foreground`, `bg-muted`). The gray palette is remapped to blue.
+- **Never create API functions in components** — all API calls go in `features/*/api.ts`.
+- **Never create hooks outside `features/`** — domain hooks live in `features/*/hooks.ts`. Only generic UI hooks (like `use-mobile`) go in `hooks/`.
+- **Never use Redux, Context, or global state for server data** — TanStack Query only.
+- **Never edit files in `components/ui/`** — these are shadcn/ui generated. Customize via theme tokens or the shadcn CLI.
+- **Never use icon libraries other than `@hugeicons/react`** with `@hugeicons/core-free-icons`.
+- **Never hardcode user-visible strings** — always use `useTranslation()`.
+- **Never use CSS modules, styled-components, or inline style objects** — Tailwind only.

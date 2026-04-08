@@ -96,3 +96,11 @@ spring.jackson:
 ## Reference
 
 The complete endpoint reference is in [`backend/docs/API.md`](../../backend/docs/API.md). When adding or changing an endpoint, update that file.
+
+## Don'ts
+
+- **Never add try/catch in controllers** — `GlobalExceptionHandler` handles everything.
+- **Never put business logic in controllers** — controllers delegate to services.
+- **Never use `@Autowired` field injection** — use constructor injection (Lombok `@RequiredArgsConstructor`).
+- **Never return raw exceptions or stack traces** — always `ProblemDetail` via the handler.
+- **Never create PATCH endpoints** — not used in this project; use PUT for updates.

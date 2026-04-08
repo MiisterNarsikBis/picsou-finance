@@ -38,14 +38,12 @@ com.picsou/
 
 **Scheduled tasks** (`SchedulerService`): daily balance snapshots and price cache refresh. `PriceService` holds a 15-minute in-memory cache to avoid hammering external APIs.
 
-**Flyway owns the schema** — never use `ddl-auto: create/update`. New columns/tables always go in a new migration file `Vn__description.sql`.
+**Flyway owns the schema** — never use `ddl-auto: create/update`. Migration details and entity conventions: see [`docs/conventions/database.md`](../docs/conventions/database.md).
 
 ## Configuration
 
-`application.yml` — production defaults. `application-dev.yml` — enables SQL logging and devtools; activated with `-Dspring-boot.run.profiles=dev`.
+`application.yml` (prod), `application-dev.yml` (dev, enables SQL logging). All secrets from env vars — see `.env.example` at project root.
 
-All secrets come from environment variables. Required at startup: `JWT_SECRET`, `APP_USERNAME`, `APP_PASSWORD_HASH` (bcrypt, cost 12). Enable Banking variables are optional if bank sync is not used.
+## Testing
 
-## Testing conventions
-
-Existing tests use Mockito (`@ExtendWith(MockitoExtension.class)`) with `@Mock`/`@InjectMocks` — no Spring context loaded, no H2 involved. Service-layer unit tests follow this pattern. Integration tests that need JPA should use `@DataJpaTest` (H2 auto-configures).
+Mockito unit tests (`@ExtendWith(MockitoExtension.class)`), `@DataJpaTest` with H2 for integration. Full conventions: see [`docs/conventions/testing.md`](../docs/conventions/testing.md).

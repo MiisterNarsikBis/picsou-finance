@@ -151,3 +151,11 @@ spring.jackson:
   write-dates-as-timestamps: false       # ISO-8601 strings
   default-property-inclusion: non_null   # omit null fields from JSON
 ```
+
+## Don'ts
+
+- **Never use `ddl-auto: create`, `update`, or `create-drop`** — Flyway owns every schema change.
+- **Never use `GenerationType.AUTO` or `SEQUENCE`** — always `GenerationType.IDENTITY`.
+- **Never use `Float` or `Double` for monetary values** — always `BigDecimal` / `NUMERIC(20, 8)`.
+- **Never skip `ON DELETE CASCADE`** on child table FKs unless orphan rows are intentional.
+- **Never use unnamed constraints** — always `CONSTRAINT uk_{table}_{columns}` / `idx_{table}_{columns}`.

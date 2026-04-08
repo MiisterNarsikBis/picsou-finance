@@ -31,11 +31,7 @@ npx vitest run       # Run all unit tests
 
 ## Code conventions
 
-- Naming: camelCase for methods/variables, PascalCase for classes
-- Packages: `com.picsou.{model,repository,service,controller,dto,port,adapter,finary,config,exception}`
-- DTOs are Java records, no MapStruct
-- No business logic in controllers
-- Tests: Mockito unit tests, `@DataJpaTest` with H2 for integration
+See [`docs/conventions/`](docs/conventions/) and module-specific CLAUDE.md files (`backend/CLAUDE.md`, `frontend/CLAUDE.md`).
 
 ## Project architecture
 
@@ -59,10 +55,16 @@ Before coding, check the relevant docs in `docs/`.
 
 ## Development workflow
 
-1. **Before coding**: read [`docs/INDEX.md`](docs/INDEX.md), identify relevant docs, read them
-2. **During**: follow conventions from [`docs/conventions/`](docs/conventions/)
-3. **After each significant feature/fix**: create or update the technical note in [`docs/features/`](docs/features/) following the [`docs/templates/FEATURE.md`](docs/templates/FEATURE.md) template
-4. **Architectural decision**: before deciding, check [`docs/decisions/`](docs/decisions/) for existing decisions. If new, create an ADR using the [`docs/templates/DECISION.md`](docs/templates/DECISION.md) template
+**Bugfix / small change:**
+1. Read the relevant feature doc in [`docs/features/`](docs/features/) (if one exists)
+2. Follow conventions from [`docs/conventions/`](docs/conventions/)
+3. Update the feature doc if behavior changed
+
+**New feature / cross-cutting change:**
+1. Read [`docs/INDEX.md`](docs/INDEX.md), identify all relevant docs
+2. Check [`docs/decisions/`](docs/decisions/) for prior ADRs on the topic
+3. Follow conventions from [`docs/conventions/`](docs/conventions/)
+4. After: create/update feature doc ([`docs/templates/FEATURE.md`](docs/templates/FEATURE.md)) and ADR if architectural ([`docs/templates/DECISION.md`](docs/templates/DECISION.md))
 
 ## Git
 
