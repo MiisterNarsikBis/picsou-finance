@@ -5,29 +5,38 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(value: number, currency = 'EUR', locale = 'fr-FR'): string {
+export function getLocale(): string {
+  try {
+    const lang = document.documentElement.lang || navigator.language
+    return lang.startsWith('fr') ? 'fr-FR' : 'en-US'
+  } catch {
+    return 'fr-FR'
+  }
+}
+
+export function formatCurrency(value: number, currency = 'EUR', locale = getLocale()): string {
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value)
 }
 
-export function formatDate(dateStr: string | null | undefined, locale = 'fr-FR'): string {
+export function formatDate(dateStr: string | null | undefined, locale = getLocale()): string {
   if (!dateStr) return '—'
   return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(dateStr))
 }
 
-export function formatPercent(value: number, locale = 'fr-FR'): string {
+export function formatPercent(value: number, locale = getLocale()): string {
   return new Intl.NumberFormat(locale, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)
 }
 
-export function todayLabel(locale = 'fr-FR'): string {
+export function todayLabel(locale = getLocale()): string {
   return new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())
 }
 
-export function formatLocalDate(dateStr: string | null | undefined, locale = 'fr-FR'): string {
+export function formatLocalDate(dateStr: string | null | undefined, locale = getLocale()): string {
   if (!dateStr) return '—'
   return new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(dateStr))
 }
 
-export function formatTimeAgo(dateStr: string | null | undefined, locale = 'fr-FR'): string {
+export function formatTimeAgo(dateStr: string | null | undefined, locale = getLocale()): string {
   if (!dateStr) return '—'
   const diff = Date.now() - new Date(dateStr).getTime()
   const minutes = Math.floor(diff / 60_000)

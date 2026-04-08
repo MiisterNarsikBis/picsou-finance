@@ -9,7 +9,7 @@ interface PriceFreshnessDotProps {
 const LIVE_THRESHOLD_MS = 2 * 60 * 1000 // 2 minutes
 
 export function PriceFreshnessDot({ priceUpdatedAt }: PriceFreshnessDotProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
   if (!priceUpdatedAt) return null
 
@@ -29,8 +29,7 @@ export function PriceFreshnessDot({ priceUpdatedAt }: PriceFreshnessDotProps) {
     )
   }
 
-  const locale = i18n.language.startsWith('fr') ? 'fr-FR' : 'en-US'
-  const timeAgo = formatTimeAgo(priceUpdatedAt, locale)
+  const timeAgo = formatTimeAgo(priceUpdatedAt)
 
   return (
     <TooltipProvider>
