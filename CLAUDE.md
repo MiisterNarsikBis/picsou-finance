@@ -47,6 +47,8 @@ For module-specific details, see:
 
 ## Technical documentation
 
+All documentation in `docs/` must be written in **English** — feature notes, ADRs, conventions, templates, and `INDEX.md`.
+
 Before coding, check the relevant docs in `docs/`.
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) -- project macro view
