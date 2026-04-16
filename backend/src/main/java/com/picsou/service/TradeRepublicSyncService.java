@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
@@ -33,12 +34,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
 @Transactional
 public class TradeRepublicSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(TradeRepublicSyncService.class);
+
+    private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "tr-sync");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final TradeRepublicPort             trPort;
     private final TradeRepublicSessionRepository sessionRepository;
@@ -47,6 +57,7 @@ public class TradeRepublicSyncService {
     private final AccountService                accountService;
     private final OpenFigiIsinConverter         isinConverter;
     private final CryptoEncryption              encryption;
+    private final TransactionTemplate           txTemplate;
 
     public TradeRepublicSyncService(
         TradeRepublicPort trPort,
@@ -55,7 +66,8 @@ public class TradeRepublicSyncService {
         AccountHoldingRepository holdingRepository,
         AccountService accountService,
         OpenFigiIsinConverter isinConverter,
-        CryptoEncryption encryption
+        CryptoEncryption encryption,
+        TransactionTemplate txTemplate
     ) {
         this.trPort            = trPort;
         this.sessionRepository = sessionRepository;
@@ -64,6 +76,7 @@ public class TradeRepublicSyncService {
         this.accountService    = accountService;
         this.isinConverter     = isinConverter;
         this.encryption        = encryption;
+        this.txTemplate        = txTemplate;
     }
 
     // ─── Auth ─────────────────────────────────────────────────────────────────
@@ -78,21 +91,36 @@ public class TradeRepublicSyncService {
         return new AuthInitResponse(processId);
     }
 
-    /** Step 2: Exchanges 2FA code for session + refresh tokens, stores them, runs initial sync. */
-    public List<AccountResponse> completeAuth(String processId, String tan) {
+    /**
+     * Step 2: Exchanges 2FA code for session + refresh tokens, stores them.
+     * Returns immediately — sync runs in background.
+     */
+    public SessionStatusResponse completeAuth(String processId, String tan) {
         TrTokens tokens = trPort.completeAuth(processId, tan);
 
         sessionRepository.deleteAll();
         TradeRepublicSession session = TradeRepublicSession.builder()
             .sessionToken(encryption.encrypt(tokens.sessionToken()))
             .refreshToken(encryption.encrypt(tokens.refreshToken()))
-            .expiresAt(Instant.now().plus(2, ChronoUnit.HOURS)) // refresh token validity
+            .expiresAt(Instant.now().plus(2, ChronoUnit.HOURS))
             .build();
         sessionRepository.save(session);
 
-        log.info("Trade Republic session stored (refresh token: {}), running initial sync",
+        log.info("Trade Republic session stored (refresh token: {}), firing background sync",
                  tokens.refreshToken() != null ? "yes" : "no");
-        return syncWithToken(tokens.sessionToken(), sessionRepository.findTopByOrderByCreatedAtDesc().orElse(null));
+
+        String plainToken = tokens.sessionToken();
+        TradeRepublicSession savedSession = sessionRepository.findTopByOrderByCreatedAtDesc().orElse(null);
+        CompletableFuture.runAsync(() -> {
+            try {
+                txTemplate.executeWithoutResult(status -> syncWithToken(plainToken, savedSession));
+                log.info("Trade Republic background sync complete");
+            } catch (Exception ex) {
+                log.error("Trade Republic background sync failed: {}", ex.getMessage());
+            }
+        }, syncExecutor);
+
+        return new SessionStatusResponse(true, session.getExpiresAt());
     }
 
     // ─── Sync ─────────────────────────────────────────────────────────────────
@@ -262,7 +290,9 @@ public class TradeRepublicSyncService {
     // ─── Private ──────────────────────────────────────────────────────────────
 
     private AccountResponse upsertAccount(TrAccountData data) {
+        log.debug("TR upsertAccount: looking for externalId={}", data.externalId());
         Optional<Account> existing = accountRepository.findByExternalAccountId(data.externalId());
+        log.debug("TR upsertAccount: found existing={}", existing.isPresent());
 
         Account account;
         if (existing.isPresent()) {
@@ -288,26 +318,28 @@ public class TradeRepublicSyncService {
 
         if (!data.positions().isEmpty()) {
             holdingRepository.deleteByAccountId(account.getId());
+            holdingRepository.flush();
             // Deduplicate by ticker: when multiple ISINs convert to the same ticker,
             // aggregate them to avoid unique constraint violations
             Map<String, HoldingAgg> deduped = new HashMap<>();
             for (TrPosition p : data.positions()) {
-                String ticker = isinConverter.isinToYahooTicker(p.isin());
-                deduped.merge(ticker, new HoldingAgg(p.quantity(), p.averageBuyIn(), p.currentPrice()),
-                    (prev, newPos) -> {
-                        // When same ticker appears multiple times, combine quantities
-                        return new HoldingAgg(
-                            prev.quantity.add(newPos.quantity),
-                            prev.averageBuyIn,
-                            prev.currentPrice
-                        );
-                    });
+                var result = isinConverter.resolve(p.isin());
+                String ticker = result.ticker();
+                String name = result.name();
+                deduped.merge(ticker, new HoldingAgg(p.quantity(), p.averageBuyIn(), p.currentPrice(), name),
+                    (prev, newPos) -> new HoldingAgg(
+                        prev.quantity.add(newPos.quantity),
+                        prev.averageBuyIn,
+                        prev.currentPrice,
+                        prev.name != null ? prev.name : newPos.name
+                    ));
             }
             for (Map.Entry<String, HoldingAgg> entry : deduped.entrySet()) {
                 HoldingAgg agg = entry.getValue();
                 holdingRepository.save(AccountHolding.builder()
                     .account(account)
                     .ticker(entry.getKey())
+                    .name(agg.name)
                     .quantity(agg.quantity)
                     .averageBuyIn(agg.averageBuyIn)
                     .currentPrice(agg.currentPrice)
@@ -337,5 +369,5 @@ public class TradeRepublicSyncService {
 
     // ─── Helper records ────────────────────────────────────────────────────────
 
-    private record HoldingAgg(BigDecimal quantity, BigDecimal averageBuyIn, BigDecimal currentPrice) {}
+    private record HoldingAgg(BigDecimal quantity, BigDecimal averageBuyIn, BigDecimal currentPrice, String name) {}
 }

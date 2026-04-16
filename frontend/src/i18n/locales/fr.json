@@ -28,6 +28,7 @@
     "sync": "Synchronisation",
     "settings": "Paramètres",
     "settings.desc": "Préférences & compte",
+    "account": "Mon compte",
     "logout": "Déconnexion"
   },
   "auth": {
@@ -43,8 +44,9 @@
   "dashboard": {
     "title": "Tableau de bord",
     "netWorth": "Patrimoine total",
+    "syncAccounts": "Synchroniser",
     "invested": "Capital investi",
-    "netWorthChange": "sur la période sélectionnée",
+    "netWorthChange": "gain / perte",
     "distribution": "Répartition",
     "ranges": {
       "1D": "1J",
@@ -62,6 +64,7 @@
     "newGoal": "Nouvel objectif",
     "achieved": "atteint",
     "goalsSummary": "Suivez votre progression vers vos objectifs financiers.",
+    "otherGoals": "{{count}} autres objectifs",
     "holdings": "Patrimoine",
     "holdingsDescription": "Votre portefeuille en un coup d'oeil",
     "searchHoldings": "Rechercher des titres ou tickers...",
@@ -69,7 +72,9 @@
     "shares": "parts",
     "gainLoss": "Plus-value / Moins-value",
     "recentAccounts": "Comptes récents",
-    "viewAll": "Voir tout"
+    "viewAll": "Voir tout",
+    "totalLiabilities": "Total des dettes",
+    "totalAssets": "Total des actifs"
   },
   "accounts": {
     "title": "Comptes",
@@ -94,6 +99,7 @@
     "addSnapshot": "Enregistrer",
     "monthlyHistory": "Solde en fin de mois",
     "evolution": "Évolution des soldes",
+    "pnl": "Plus-value / Moins-value",
     "filters": {
       "ALL": "Tout",
       "STOCKS": "Actions & Fonds",
@@ -101,7 +107,8 @@
       "SAVINGS": "Livrets",
       "CHECKING": "Comptes courants",
       "CRYPTO": "Crypto",
-      "REAL_ESTATE": "Immobilier"
+      "REAL_ESTATE": "Immobilier",
+      "DEBTS": "Dettes"
     }
   },
   "accountTypes": {
@@ -111,7 +118,38 @@
     "pea": "PEA",
     "compteTitres": "Compte titres",
     "crypto": "Crypto",
+    "realEstate": "Immobilier",
+    "loan": "Prêt",
     "other": "Autre"
+  },
+  "realEstate": {
+    "purchasePrice": "Prix d'achat",
+    "purchaseDate": "Date d'achat",
+    "surfaceArea": "Surface (m²)",
+    "address": "Adresse",
+    "propertyType": "Type de bien",
+    "rentalIncome": "Loyer mensuel",
+    "currentValue": "Valeur actuelle",
+    "appreciation": "Plus-value",
+    "propertyTypes": {
+      "APARTMENT": "Appartement",
+      "HOUSE": "Maison",
+      "LAND": "Terrain",
+      "PARKING": "Parking",
+      "COMMERCIAL": "Local commercial"
+    }
+  },
+  "debt": {
+    "borrowedAmount": "Montant emprunté",
+    "interestRate": "Taux d'intérêt",
+    "monthlyPayment": "Mensualité",
+    "lenderName": "Organisme prêteur",
+    "linkedAccount": "Bien lié",
+    "startDate": "Date de début",
+    "endDate": "Date de fin",
+    "remaining": "Capital restant",
+    "repaid": "Capital remboursé",
+    "progress": "Progression du remboursement"
   },
   "portfolio": {
     "title": "Patrimoine détaillé",
@@ -165,7 +203,9 @@
     "of": "sur",
     "clickMonthHint": "Cliquez sur un mois pour voir les détails",
     "noData": "—",
-    "futureMonth": "···"
+    "futureMonth": "···",
+    "linkedAccounts": "Comptes liés",
+    "history": "Historique"
   },
   "addAccount": {
     "title": "Ajouter un compte",
@@ -200,7 +240,8 @@
       "deleteConfirm": "Supprimer cette connexion bancaire ?",
       "callbackCompleting": "Récupération des comptes...",
       "callbackDone": "Comptes synchronisés !",
-      "callbackError": "Erreur de synchronisation"
+      "callbackError": "Erreur de synchronisation",
+      "initiateError": "Échec de la connexion"
     },
     "tr": {
       "title": "Trade Republic",
@@ -262,7 +303,33 @@
       "accountsCreated": "Comptes créés",
       "accountsMapped": "Comptes mappés",
       "accountsSkipped": "Comptes ignorés",
-      "transactionsImported": "Transactions importées"
+      "transactionsImported": "Transactions importées",
+      "email": "Email",
+      "emailPlaceholder": "votre@email.com",
+      "password": "Mot de passe",
+      "login": "Se connecter à Finary",
+      "loggingIn": "Connexion...",
+      "loginSuccess": "Connecté avec succès",
+      "connected": "Connecté",
+      "notConnected": "Non connecté",
+      "lastSync": "Dernière synchro",
+      "neverSynced": "Jamais",
+      "sync": "Synchroniser",
+      "syncing": "Synchronisation...",
+      "deleteConnection": "Déconnecter",
+      "deleteConnectionConfirm": "Supprimer les identifiants Finary stockés ? Les comptes déjà importés seront conservés.",
+      "newAccounts": "Nouveaux comptes détectés",
+      "allAccountsMapped": "Tous les comptes déjà mappés, synchronisation..."
+    },
+    "all": {
+      "title": "Synchroniser les comptes",
+      "syncAll": "Tout synchroniser",
+      "syncing": "Synchronisation...",
+      "noConnections": "Aucune connexion de synchronisation active",
+      "lastSync": "Dernière sync",
+      "openFinary": "Ouvrir la page Finary pour synchroniser",
+      "trManualInfo": "Trade Republic est la seule banque qui nécessite une reconnexion manuelle. Vous devrez ressaisir votre numéro et PIN à chaque synchronisation.",
+      "trSlowWarning": "La connexion peut prendre quelques instants, c'est normal."
     }
   },
   "settings": {
@@ -278,9 +345,10 @@
     "newPassword": "Nouveau mot de passe",
     "confirmPassword": "Confirmer le mot de passe",
     "passwordChanged": "Mot de passe mis à jour",
-    "demoMode": "Mode démo",
-    "demoModeDesc": "Active le mode démonstration avec des données fictives",
     "appearanceDescription": "Personnaliser l'apparence de l'application",
+    "dateFormat": "Format de date",
+    "dateFormatLocale": "Localisé",
+    "dateFormatIso": "JJ-MM-AAAA",
     "account": "Compte",
     "accountDescription": "Gérer votre compte",
     "username": "Nom d'utilisateur",
@@ -288,5 +356,18 @@
     "about": "À propos",
     "aboutDescription": "Informations sur l'application",
     "version": "Version"
+  },
+  "error": {
+    "connecting": "Connexion au serveur...",
+    "noConnection": "Impossible de se connecter au serveur",
+    "noConnectionDesc": "Vérifiez que le serveur est démarré et réessayez.",
+    "degradedMode": "Aucune connexion au serveur. Certaines fonctionnalités peuvent ne pas fonctionner.",
+    "notFound": "La page que vous recherchez n'existe pas.",
+    "backToDashboard": "Retour au tableau de bord",
+    "forbidden": "Vous n'avez pas la permission d'accéder à cette page.",
+    "serverError": "Une erreur inattendue s'est produite sur le serveur.",
+    "crashTitle": "Une erreur est survenue",
+    "crashDesc": "Une erreur inattendue s'est produite. Veuillez recharger la page.",
+    "reload": "Recharger la page"
   }
 }

@@ -84,7 +84,7 @@ public class FinaryImportService {
 
             int totalTx = (int) parsed.transactions.stream().count();
 
-            return new FinaryPreviewResponse(previews, existing, totalTx, fileToken);
+            return new FinaryPreviewResponse(previews, existing, totalTx, fileToken, false, List.of());
 
         } catch (IOException e) {
             throw new IllegalArgumentException("Not a valid xlsx file", e);

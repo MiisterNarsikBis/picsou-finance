@@ -1,5 +1,5 @@
 import { api } from '@/lib/api-client'
-import type { Account, AccountRequest, BalanceSnapshot, HoldingResponse, Transaction } from '@/types/api'
+import type { Account, AccountRequest, BalanceSnapshot, DebtRequest, DebtInfo, HoldingResponse, RealEstateMetadataRequest, RealEstateMetadata, Transaction } from '@/types/api'
 
 export const accountsApi = {
   list: () => api.get<Account[]>('/accounts').then(r => r.data),
@@ -17,4 +17,8 @@ export const accountsApi = {
     api.get<Record<string, number>>('/prices', { params: { tickers: tickers.join(',') } }).then(r => r.data),
   addSnapshot: (id: number, balance: number, date: string) =>
     api.post<BalanceSnapshot>(`/accounts/${id}/history`, { balance, date }).then(r => r.data),
+  updateRealEstateMetadata: (id: number, data: RealEstateMetadataRequest) =>
+    api.put<RealEstateMetadata>(`/accounts/${id}/real-estate`, data).then(r => r.data),
+  updateDebtMetadata: (id: number, data: DebtRequest) =>
+    api.put<DebtInfo>(`/accounts/${id}/debt`, data).then(r => r.data),
 }

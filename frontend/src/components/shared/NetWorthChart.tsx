@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, CartesianGrid, Legend, Line, XAxis, YAxis } from 'recharts'
 import { type ChartConfig, ChartContainer, ChartTooltip } from '@/components/ui/chart'
@@ -6,7 +6,9 @@ import { TimeRangeSelector, type TimeRange } from '@/components/shared/TimeRange
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 interface NetWorthChartProps {
-  data: { date: string; total: number; invested: number }[]
+  data: { date: string; total: number; invested?: number }[]
+  range: TimeRange
+  onRangeChange: (range: TimeRange) => void
 }
 
 function NetWorthTooltip({ active, payload, labels }: {
@@ -14,19 +16,20 @@ function NetWorthTooltip({ active, payload, labels }: {
   payload?: Array<{
     value: number
     dataKey: string
-    payload: { date: string; total: number; invested: number }
+    payload: { date: string; total: number; invested?: number }
   }>
   labels: { total: string; invested: string; gainLoss: string; locale: string; currency: string }
 }) {
   if (!active || !payload?.length) return null
 
   const totalItem = payload.find(p => p.dataKey === 'total')
-  const investedItem = payload.find(p => p.dataKey === 'invested')
-  if (!totalItem || !investedItem) return null
+  if (!totalItem) return null
 
   const total = totalItem.value as number
-  const invested = investedItem.value as number
-  const gainLoss = total - invested
+  const investedItem = payload.find(p => p.dataKey === 'invested')
+  const hasInvested = investedItem != null
+  const invested = hasInvested ? (investedItem.value as number) : 0
+  const gainLoss = hasInvested ? total - invested : null
   const dateStr = totalItem.payload?.date
 
   return (
@@ -42,23 +45,29 @@ function NetWorthTooltip({ active, payload, labels }: {
           {formatCurrency(total, labels.currency, labels.locale)}
         </span>
       </div>
-      <div className="flex items-center gap-2 py-0.5">
-        <div
-          className="h-0.5 w-4 shrink-0 border-t-2 border-dashed"
-          style={{ borderColor: 'var(--color-invested)' }}
-        />
-        <span className="text-muted-foreground">{labels.invested}</span>
-        <span className="ml-auto font-mono font-medium tabular-nums">
-          {formatCurrency(invested, labels.currency, labels.locale)}
-        </span>
-      </div>
-      <div className="my-1.5 border-t border-border" />
-      <div className="flex items-center justify-between py-0.5">
-        <span className={`font-mono font-medium tabular-nums ${gainLoss >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-          {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, labels.currency, labels.locale)}
-        </span>
-        <span className="text-muted-foreground">{labels.gainLoss}</span>
-      </div>
+      {hasInvested && (
+        <div className="flex items-center gap-2 py-0.5">
+          <div
+            className="h-0.5 w-4 shrink-0 border-t-2 border-dashed"
+            style={{ borderColor: 'var(--color-invested)' }}
+          />
+          <span className="text-muted-foreground">{labels.invested}</span>
+          <span className="ml-auto font-mono font-medium tabular-nums">
+            {formatCurrency(invested, labels.currency, labels.locale)}
+          </span>
+        </div>
+      )}
+      {hasInvested && gainLoss !== null && (
+        <>
+          <div className="my-1.5 border-t border-border" />
+          <div className="flex items-center justify-between py-0.5">
+            <span className={`font-mono font-medium tabular-nums ${gainLoss >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, labels.currency, labels.locale)}
+            </span>
+            <span className="text-muted-foreground">{labels.gainLoss}</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -78,10 +87,9 @@ function filterByRange(data: NetWorthChartProps['data'], range: TimeRange) {
   return data.filter(p => new Date(p.date) >= from)
 }
 
-export function NetWorthChart({ data }: NetWorthChartProps) {
+export function NetWorthChart({ data, range, onRangeChange }: NetWorthChartProps) {
   const { t } = useTranslation()
   const locale = t('common.locale')
-  const [range, setRange] = useState<TimeRange>('1Y')
 
   const filteredData = useMemo(() => filterByRange(data, range), [data, range])
 
@@ -107,7 +115,7 @@ export function NetWorthChart({ data }: NetWorthChartProps) {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <TimeRangeSelector value={range} onChange={setRange} />
+        <TimeRangeSelector value={range} onChange={onRangeChange} />
       </div>
       <ChartContainer config={chartConfig} className="h-[250px] w-full [&>div>div]:!w-full [&>div>div>svg]:!w-full">
         <AreaChart data={filteredData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>

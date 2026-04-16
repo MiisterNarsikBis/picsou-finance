@@ -68,7 +68,7 @@ for (let i = 1; i <= 7; i++) {
 }
 
 // Account details: history for multiple accounts (12 months each)
-function generateHistory(startBalances: number[], currentBalance: number, volatility = 0.03) {
+function generateHistory(startBalances: number[], _currentBalance: number) {
   const now = new Date()
   const points: { id: number; date: string; balance: number }[] = []
   const months = startBalances.length

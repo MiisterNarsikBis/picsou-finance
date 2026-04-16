@@ -3,17 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from '@/features/goals/hooks'
 import { useAccounts } from '@/features/accounts/hooks'
-import { GoalProgressBar } from '@/components/shared/GoalProgressBar'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { GoalDetailModal } from './GoalDetailModal'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,6 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react'
-import { formatLocalDate } from '@/lib/utils'
 import type { GoalProgress } from '@/types/api'
 
 const emptyForm = {
@@ -55,6 +55,7 @@ export function GoalsPage() {
   const [editingGoal, setEditingGoal] = useState<GoalProgress | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [detailGoalId, setDetailGoalId] = useState<number | null>(null)
 
   const openCreate = () => {
     setEditingGoal(null)
@@ -141,10 +142,17 @@ export function GoalsPage() {
               onEdit={() => openEdit(goal)}
               onDelete={() => setDeleteId(goal.id)}
               onCalendar={() => navigate(`/goals/${goal.id}/calendar`)}
+              onOpenDetail={() => setDetailGoalId(goal.id)}
             />
           ))}
         </div>
       )}
+
+      {/* Goal detail modal */}
+      <GoalDetailModal
+        goalId={detailGoalId}
+        onClose={() => setDetailGoalId(null)}
+      />
 
       {/* Create / Edit dialog */}
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) closeForm() }}>
@@ -263,9 +271,10 @@ interface GoalCardProps {
   onEdit: () => void
   onDelete: () => void
   onCalendar: () => void
+  onOpenDetail: () => void
 }
 
-function GoalCard({ goal, onEdit, onDelete, onCalendar }: GoalCardProps) {
+function GoalCard({ goal, onEdit, onDelete, onCalendar, onOpenDetail }: GoalCardProps) {
   const { t } = useTranslation()
 
   const statusBadge = (() => {
@@ -301,44 +310,62 @@ function GoalCard({ goal, onEdit, onDelete, onCalendar }: GoalCardProps) {
   })()
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div>
-              <CardTitle className="text-base">{goal.name}</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {t('goals.deadline')}: {formatLocalDate(goal.deadline)}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
+    <Card
+      className="cursor-pointer transition-colors hover:bg-accent/50"
+      onClick={onOpenDetail}
+    >
+      <CardContent className="p-4">
+        {/* Header: name + status + actions */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="cn-font-heading text-xs font-medium tracking-wider text-muted-foreground uppercase truncate">
+              {goal.name}
+            </span>
             {statusBadge}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
-              <Pencil className="size-4" />
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+              <Pencil className="size-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onCalendar}>
-              <Calendar className="size-4" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onCalendar}>
+              <Calendar className="size-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={onDelete}
             >
-              <Trash2 className="size-4" />
+              <Trash2 className="size-3.5" />
             </Button>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-4">
+        {/* Current total */}
+        <CurrencyDisplay
+          value={goal.currentTotal}
+          className="text-3xl font-semibold tabular-nums"
+        />
+
         {/* Progress bar */}
-        <GoalProgressBar goal={goal} />
+        <Progress
+          value={goal.percentComplete}
+          className="h-2.5 mt-3 [&_[data-slot=progress-indicator]]:bg-emerald-500"
+        />
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t">
+        {/* Footer: percent + target */}
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-sm text-muted-foreground">
+            {Math.round(goal.percentComplete)}% {t('dashboard.achieved')}
+          </span>
+          <CurrencyDisplay
+            value={goal.targetAmount}
+            className="text-sm font-medium tabular-nums"
+          />
+        </div>
+
+        {/* Secondary stats */}
+        <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t">
           <div>
             <p className="text-xs text-muted-foreground mb-0.5">{t('goals.monthsLeft')}</p>
             <p className="text-sm font-semibold">{goal.monthsLeft}</p>
@@ -355,20 +382,11 @@ function GoalCard({ goal, onEdit, onDelete, onCalendar }: GoalCardProps) {
               {goal.avgMonthlyContribution != null ? (
                 <CurrencyDisplay value={goal.avgMonthlyContribution} />
               ) : (
-                '–'
+                '\u2013'
               )}
             </p>
           </div>
         </div>
-
-        {/* Account chips */}
-        {goal.accounts.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {goal.accounts.map((a) => (
-              <Badge key={a.id} variant="secondary">{a.name}</Badge>
-            ))}
-          </div>
-        )}
       </CardContent>
     </Card>
   )

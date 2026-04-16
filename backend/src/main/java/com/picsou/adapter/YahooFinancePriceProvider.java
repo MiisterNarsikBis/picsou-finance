@@ -119,7 +119,13 @@ public class YahooFinancePriceProvider implements PriceProviderPort {
     record Chart(List<ChartResult> result) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record ChartResult(Meta meta, List<Long> timestamp, List<Double> close) {}
+    record ChartResult(Meta meta, List<Long> timestamp, Indicators indicators) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Indicators(List<Quote> quote) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Quote(List<Double> close) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Meta(double regularMarketPrice, String currency) {}
@@ -146,11 +152,15 @@ public class YahooFinancePriceProvider implements PriceProviderPort {
             }
 
             var result = response.chart().result().get(0);
-            if (result.timestamp() == null || result.close() == null) return Map.of();
+            if (result.timestamp() == null
+                || result.indicators() == null
+                || result.indicators().quote() == null
+                || result.indicators().quote().isEmpty()
+                || result.indicators().quote().get(0).close() == null) return Map.of();
 
             Map<LocalDate, BigDecimal> prices = new HashMap<>();
             List<Long> timestamps = result.timestamp();
-            List<Double> closes = result.close();
+            List<Double> closes = result.indicators().quote().get(0).close();
 
             for (int i = 0; i < timestamps.size() && i < closes.size(); i++) {
                 LocalDate date = Instant.ofEpochSecond(timestamps.get(i))

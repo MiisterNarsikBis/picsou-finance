@@ -32,6 +32,10 @@ public class BalanceSnapshot {
     @Column(nullable = false, precision = 20, scale = 8)
     private BigDecimal balance;
 
+    @Column(name = "invested_amount", nullable = false, precision = 20, scale = 8)
+    @Builder.Default
+    private BigDecimal investedAmount = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private java.time.Instant createdAt = java.time.Instant.now();

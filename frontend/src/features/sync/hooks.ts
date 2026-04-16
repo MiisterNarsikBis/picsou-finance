@@ -56,6 +56,7 @@ export function useInitiateBankSync() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.banks() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -67,6 +68,7 @@ export function useCompleteBankSync() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.banks() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -78,6 +80,7 @@ export function useRetryBankSync() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.banks() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -89,6 +92,7 @@ export function useDeleteBankConnection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.banks() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -121,6 +125,7 @@ export function useCompleteTrAuth() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.tr() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -132,6 +137,7 @@ export function useSyncTradeRepublic() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.tr() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -143,6 +149,7 @@ export function useImportTrCsv() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.tr() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -153,6 +160,8 @@ export function useClearTrSession() {
     mutationFn: () => trApi.clearSession(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.tr() })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -178,6 +187,7 @@ export function useAddCryptoExchange() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.exchanges() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -189,6 +199,7 @@ export function useSyncCryptoExchange() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.exchanges() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -200,6 +211,7 @@ export function useRemoveCryptoExchange() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.exchanges() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -225,6 +237,7 @@ export function useAddCryptoWallet() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.wallets() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -236,6 +249,7 @@ export function useSyncCryptoWallet() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.wallets() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -247,6 +261,7 @@ export function useRemoveCryptoWallet() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.wallets() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -255,11 +270,35 @@ export function useRemoveCryptoWallet() {
 // Finary
 // ---------------------------------------------------------------------------
 
-export function useIsFinaryConfigured() {
+export function useFinaryConnectionStatus() {
   return useQuery({
     queryKey: syncKeys.finary(),
-    queryFn: finaryApi.isConfigured,
-    staleTime: 5 * 60_000,
+    queryFn: finaryApi.getStatus,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+}
+
+export function useFinaryLogin() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) =>
+      finaryApi.login(email, password),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: syncKeys.finary() })
+    },
+  })
+}
+
+export function useFinaryDeleteSession() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => finaryApi.deleteSession(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: syncKeys.finary() })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
   })
 }
 

@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { createDemoAdapter } from '@/demo'
+import { useAppStore } from '@/stores/app-store'
+import { useConnectivityStore } from '@/stores/connectivity-store'
 
 export const api = axios.create({
   baseURL: '/api',
@@ -24,10 +26,40 @@ function notifyRefreshSubscribers() {
 }
 
 api.interceptors.response.use(
-  res => res,
+  res => {
+    // Mark as connected on any successful response (skip demo mode)
+    if (!useAppStore.getState().demoMode) {
+      useConnectivityStore.getState().setConnected(true)
+    }
+    return res
+  },
   async error => {
     const originalRequest = error.config as typeof error.config & { _retry?: boolean }
 
+    // Network error detection (no response at all, or CORS-blocked)
+    if (!error.response && !error.config?.url?.includes('/auth/')) {
+      if (!useAppStore.getState().demoMode) {
+        useConnectivityStore.getState().setConnected(false)
+      }
+    }
+
+    // 403: Forbidden
+    if (error.response?.status === 403 && error.config?.method === 'get') {
+      window.location.href = '/error/403'
+      return Promise.reject(error)
+    }
+
+    // 5xx: Server errors (GET only to avoid disrupting mutations)
+    if (
+      error.response?.status >= 500 &&
+      error.response?.status < 600 &&
+      error.config?.method === 'get'
+    ) {
+      window.location.href = '/error/500?code=' + error.response.status
+      return Promise.reject(error)
+    }
+
+    // 401: Unauthorized - token refresh
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&

@@ -2,12 +2,26 @@ package com.picsou.service;
 
 import com.picsou.dto.AccountRequest;
 import com.picsou.dto.AccountResponse;
+import com.picsou.dto.DebtRequest;
+import com.picsou.dto.DebtResponse;
+import com.picsou.dto.HoldingResponse;
+import com.picsou.dto.RealEstateMetadataRequest;
+import com.picsou.dto.RealEstateMetadataResponse;
 import com.picsou.dto.SnapshotRequest;
+import com.picsou.dto.TransactionResponse;
 import com.picsou.exception.ResourceNotFoundException;
 import com.picsou.model.Account;
+import com.picsou.model.AccountHolding;
+import com.picsou.model.AccountType;
 import com.picsou.model.BalanceSnapshot;
+import com.picsou.model.Debt;
+import com.picsou.model.RealEstateMetadata;
+import com.picsou.repository.AccountHoldingRepository;
 import com.picsou.repository.AccountRepository;
 import com.picsou.repository.BalanceSnapshotRepository;
+import com.picsou.repository.DebtRepository;
+import com.picsou.repository.RealEstateMetadataRepository;
+import com.picsou.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,15 +37,27 @@ public class AccountService {
 
     private final AccountRepository accountRepository;
     private final BalanceSnapshotRepository snapshotRepository;
+    private final AccountHoldingRepository holdingRepository;
+    private final TransactionRepository transactionRepository;
+    private final RealEstateMetadataRepository realEstateMetadataRepository;
+    private final DebtRepository debtRepository;
     private final PriceService priceService;
 
     public AccountService(
         AccountRepository accountRepository,
         BalanceSnapshotRepository snapshotRepository,
+        AccountHoldingRepository holdingRepository,
+        TransactionRepository transactionRepository,
+        RealEstateMetadataRepository realEstateMetadataRepository,
+        DebtRepository debtRepository,
         PriceService priceService
     ) {
         this.accountRepository = accountRepository;
         this.snapshotRepository = snapshotRepository;
+        this.holdingRepository = holdingRepository;
+        this.transactionRepository = transactionRepository;
+        this.realEstateMetadataRepository = realEstateMetadataRepository;
+        this.debtRepository = debtRepository;
         this.priceService = priceService;
     }
 
@@ -62,7 +88,8 @@ public class AccountService {
 
         // Create initial snapshot if balance is provided
         if (account.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0) {
-            createSnapshot(account, account.getCurrentBalance(), LocalDate.now());
+            BigDecimal invested = calculateInvestedAmount(account);
+            createSnapshot(account, account.getCurrentBalance(), invested, LocalDate.now());
         }
 
         return toResponse(account);
@@ -121,23 +148,87 @@ public class AccountService {
         return snapshotRepository.findByAccountIdAndDateBetweenOrderByDateAsc(accountId, effectiveFrom, effectiveTo);
     }
 
+    public List<HoldingResponse> getHoldings(Long accountId) {
+        getOrThrow(accountId); // validate account exists
+        return holdingRepository.findByAccountIdOrderByCurrentPriceDesc(accountId).stream()
+            .map(this::toHoldingResponse)
+            .toList();
+    }
+
+    public List<TransactionResponse> getTransactions(Long accountId) {
+        getOrThrow(accountId); // validate account exists
+        return transactionRepository.findByAccountIdOrderByDateDesc(accountId).stream()
+            .map(TransactionResponse::from)
+            .toList();
+    }
+
+    @Transactional
+    public AccountHolding upsertHolding(Long accountId, String ticker, String name,
+                                         BigDecimal quantity, BigDecimal currentPriceEur) {
+        Account account = getOrThrow(accountId);
+        Optional<AccountHolding> existing = holdingRepository.findByAccountIdAndTicker(accountId, ticker);
+        AccountHolding holding;
+        if (existing.isPresent()) {
+            holding = existing.get();
+            holding.setQuantity(quantity);
+            holding.setCurrentPrice(currentPriceEur);
+            holding.setLastSyncedAt(Instant.now());
+            // Keep averageBuyIn unchanged — it's the cost basis from first sync
+        } else {
+            holding = AccountHolding.builder()
+                .account(account)
+                .ticker(ticker)
+                .name(name)
+                .quantity(quantity)
+                .averageBuyIn(currentPriceEur) // baseline: no PnL at first sync
+                .currentPrice(currentPriceEur)
+                .lastSyncedAt(Instant.now())
+                .build();
+        }
+        return holdingRepository.save(holding);
+    }
+
     // ─── Package-private helpers used by other services ──────────────────────
 
+    /**
+     * Calculate the invested amount (cost basis) for an account.
+     * For accounts with holdings: SUM(quantity × averageBuyIn).
+     * For cash accounts: same as the current balance.
+     */
+    public BigDecimal calculateInvestedAmount(Account account) {
+        List<AccountHolding> holdings = holdingRepository.findByAccount_Id(account.getId());
+        if (holdings.isEmpty()) {
+            return account.getCurrentBalance();
+        }
+        return holdings.stream()
+            .map(h -> h.getAverageBuyIn() != null
+                ? h.getAverageBuyIn().multiply(h.getQuantity())
+                : BigDecimal.ZERO)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     BalanceSnapshot upsertSnapshot(Account account, BigDecimal balance, LocalDate date) {
+        BigDecimal invested = calculateInvestedAmount(account);
+        return upsertSnapshot(account, balance, invested, date);
+    }
+
+    BalanceSnapshot upsertSnapshot(Account account, BigDecimal balance, BigDecimal investedAmount, LocalDate date) {
         Optional<BalanceSnapshot> existing = snapshotRepository.findByAccountIdAndDate(account.getId(), date);
         if (existing.isPresent()) {
             BalanceSnapshot snap = existing.get();
             snap.setBalance(balance);
+            snap.setInvestedAmount(investedAmount);
             return snapshotRepository.save(snap);
         }
-        return createSnapshot(account, balance, date);
+        return createSnapshot(account, balance, investedAmount, date);
     }
 
-    private BalanceSnapshot createSnapshot(Account account, BigDecimal balance, LocalDate date) {
+    private BalanceSnapshot createSnapshot(Account account, BigDecimal balance, BigDecimal investedAmount, LocalDate date) {
         return snapshotRepository.save(BalanceSnapshot.builder()
             .account(account)
             .date(date)
             .balance(balance)
+            .investedAmount(investedAmount)
             .build());
     }
 
@@ -146,12 +237,133 @@ public class AccountService {
             .orElseThrow(() -> ResourceNotFoundException.account(id));
     }
 
+    /**
+     * Returns the live balance in EUR for an account.
+     * For accounts with holdings, computes live total from current prices.
+     * For cash accounts, returns the stored balance converted to EUR.
+     */
+    public BigDecimal liveBalanceEur(Account account) {
+        List<AccountHolding> holdings = holdingRepository.findByAccount_Id(account.getId());
+        if (holdings.isEmpty()) {
+            return priceService.toEur(account.getCurrentBalance(), account.getCurrency(), account.getTicker());
+        }
+        BigDecimal liveValue = BigDecimal.ZERO;
+        for (AccountHolding h : holdings) {
+            BigDecimal qty = h.getQuantity();
+            BigDecimal livePrice = h.getTicker() != null ? priceService.getPriceEur(h.getTicker()) : null;
+            if (livePrice == null) {
+                livePrice = h.getCurrentPrice() != null ? h.getCurrentPrice() : BigDecimal.ZERO;
+            }
+            liveValue = liveValue.add(qty.multiply(livePrice));
+        }
+        return liveValue;
+    }
+
     AccountResponse toResponse(Account account) {
         BigDecimal balanceEur = priceService.toEur(
             account.getCurrentBalance(),
             account.getCurrency(),
             account.getTicker()
         );
-        return AccountResponse.from(account, balanceEur);
+        AccountResponse response = AccountResponse.from(account, balanceEur);
+
+        if (account.getType() == AccountType.REAL_ESTATE) {
+            Optional<RealEstateMetadataResponse> meta = realEstateMetadataRepository.findByAccountId(account.getId())
+                .map(RealEstateMetadataResponse::from);
+            if (meta.isPresent()) {
+                response = response.withRealEstate(meta.get());
+            }
+        }
+
+        if (account.getType() == AccountType.LOAN) {
+            Optional<DebtResponse> debt = debtRepository.findByAccountId(account.getId())
+                .map(DebtResponse::from);
+            if (debt.isPresent()) {
+                response = response.withDebt(debt.get());
+            }
+        }
+
+        return response;
+    }
+
+    @Transactional
+    public RealEstateMetadataResponse updateRealEstateMetadata(Long accountId, RealEstateMetadataRequest req) {
+        Account account = getOrThrow(accountId);
+
+        RealEstateMetadata metadata = realEstateMetadataRepository.findByAccountId(accountId)
+            .orElseGet(() -> RealEstateMetadata.builder().account(account).build());
+
+        metadata.setPurchasePrice(req.purchasePrice());
+        metadata.setPurchaseDate(req.purchaseDate());
+        metadata.setSurfaceArea(req.surfaceArea());
+        metadata.setAddress(req.address());
+        metadata.setPropertyType(req.propertyType());
+        metadata.setRentalIncome(req.rentalIncome() != null ? req.rentalIncome() : BigDecimal.ZERO);
+
+        return RealEstateMetadataResponse.from(realEstateMetadataRepository.save(metadata));
+    }
+
+    @Transactional
+    public DebtResponse updateDebtMetadata(Long accountId, DebtRequest req) {
+        Account account = getOrThrow(accountId);
+
+        Debt debt = debtRepository.findByAccountId(accountId)
+            .orElseGet(() -> Debt.builder().account(account).build());
+
+        if (req.linkedAccountId() != null) {
+            Account linked = accountRepository.findById(req.linkedAccountId())
+                .orElseThrow(() -> ResourceNotFoundException.account(req.linkedAccountId()));
+            debt.setLinkedAccount(linked);
+        } else {
+            debt.setLinkedAccount(null);
+        }
+
+        debt.setBorrowedAmount(req.borrowedAmount());
+        debt.setInterestRate(req.interestRate());
+        debt.setMonthlyPayment(req.monthlyPayment());
+        debt.setLenderName(req.lenderName());
+        debt.setStartDate(req.startDate());
+        debt.setEndDate(req.endDate());
+
+        return DebtResponse.from(debtRepository.save(debt));
+    }
+
+    private HoldingResponse toHoldingResponse(AccountHolding holding) {
+        BigDecimal currentPrice = holding.getCurrentPrice();
+        BigDecimal currentPriceEur = null;
+        Instant priceUpdatedAt = null;
+
+        // Fetch current price from price service if ticker exists
+        if (holding.getTicker() != null && !holding.getTicker().isBlank()) {
+            currentPriceEur = priceService.getPriceEur(holding.getTicker());
+            // If no price in cache, use the stored price as fallback
+            if (currentPriceEur == null && currentPrice != null) {
+                currentPriceEur = currentPrice;
+            }
+            priceUpdatedAt = holding.getLastSyncedAt();
+        }
+
+        // Calculate values
+        BigDecimal quantity = holding.getQuantity();
+        BigDecimal averageBuyIn = holding.getAverageBuyIn();
+        BigDecimal costBasis = (averageBuyIn != null ? averageBuyIn : BigDecimal.ZERO).multiply(quantity);
+        BigDecimal currentValueEur = (currentPriceEur != null ? currentPriceEur : BigDecimal.ZERO).multiply(quantity);
+        BigDecimal pnlEur = currentValueEur.subtract(costBasis);
+        BigDecimal pnlPercent = costBasis.compareTo(BigDecimal.ZERO) != 0
+            ? pnlEur.divide(costBasis, 4, BigDecimal.ROUND_HALF_UP).multiply(BigDecimal.valueOf(100))
+            : null;
+
+        return new HoldingResponse(
+            holding.getTicker(),
+            holding.getName(),
+            quantity,
+            averageBuyIn,
+            currentPrice,
+            currentPriceEur,
+            costBasis,
+            pnlEur,
+            pnlPercent,
+            priceUpdatedAt
+        );
     }
 }

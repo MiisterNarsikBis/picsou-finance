@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { type Theme, applyTheme, getStoredTheme } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
-import { useAppStore } from '@/stores/app-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { useAppStore, type DateFormat } from '@/stores/app-store'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,12 +15,10 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import {
   Paintbrush,
   Globe,
   User,
-  Info,
   LogOut,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -99,8 +97,8 @@ function SectionCard({
 export function SettingsPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
-  const { demoMode, setDemoMode } = useAppStore()
   const { username, logout } = useAuthStore()
+  const { dateFormat, setDateFormat } = useAppStore()
 
   // Theme -----------------------------------------------------------------
   const [theme, setTheme] = useState<Theme>(getStoredTheme)
@@ -136,6 +134,11 @@ export function SettingsPage() {
     { value: 'en', label: 'EN' },
   ]
 
+  const dateFormatOptions: ToggleOption[] = [
+    { value: 'locale', label: t('settings.dateFormatLocale') },
+    { value: 'iso', label: t('settings.dateFormatIso') },
+  ]
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title={t('settings.title')} />
@@ -166,24 +169,16 @@ export function SettingsPage() {
               onChange={handleLocaleChange}
             />
           </div>
-        </div>
-      </SectionCard>
 
-      {/* Demo Mode -------------------------------------------------------- */}
-      <SectionCard
-        icon={Info}
-        title={t('settings.demoMode')}
-        description={t('settings.demoModeDesc')}
-      >
-        <div className="flex items-center justify-between">
-          <Label htmlFor="demo-toggle" className="text-sm font-medium">
-            {t('settings.demoMode')}
-          </Label>
-          <Switch
-            id="demo-toggle"
-            checked={demoMode}
-            onCheckedChange={setDemoMode}
-          />
+          {/* Date format */}
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">{t('settings.dateFormat')}</Label>
+            <ToggleGroup
+              options={dateFormatOptions}
+              value={dateFormat}
+              onChange={(v) => setDateFormat(v as DateFormat)}
+            />
+          </div>
         </div>
       </SectionCard>
 

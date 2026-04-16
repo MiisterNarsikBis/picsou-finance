@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { RequireAuth, PublicOnly } from '@/features/auth/guards'
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -37,6 +37,16 @@ const SettingsPage = lazy(() =>
   }))
 )
 
+const NotFoundPage = lazy(() =>
+  import('@/pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
+)
+const ForbiddenPage = lazy(() =>
+  import('@/pages/error/ForbiddenPage').then((m) => ({ default: m.ForbiddenPage }))
+)
+const ServerErrorPage = lazy(() =>
+  import('@/pages/error/ServerErrorPage').then((m) => ({ default: m.ServerErrorPage }))
+)
+
 function SuspensePage({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<LoadingSkeleton />}>{children}</Suspense>
 }
@@ -50,6 +60,22 @@ export const router = createBrowserRouter([
           <LoginPage />
         </SuspensePage>
       </PublicOnly>
+    ),
+  },
+  {
+    path: '/error/403',
+    element: (
+      <SuspensePage>
+        <ForbiddenPage />
+      </SuspensePage>
+    ),
+  },
+  {
+    path: '/error/500',
+    element: (
+      <SuspensePage>
+        <ServerErrorPage />
+      </SuspensePage>
     ),
   },
   {
@@ -70,5 +96,12 @@ export const router = createBrowserRouter([
       { path: 'settings', element: <SuspensePage><SettingsPage /></SuspensePage> },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
+  {
+    path: '*',
+    element: (
+      <SuspensePage>
+        <NotFoundPage />
+      </SuspensePage>
+    ),
+  },
 ])

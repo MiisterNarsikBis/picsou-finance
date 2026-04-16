@@ -1,6 +1,6 @@
 # Feature: Trade Republic Sync
 
-> Last updated: 2026-04-08
+> Last updated: 2026-04-12
 
 ## Context
 
@@ -20,7 +20,9 @@ Credentials (phone/PIN) are never stored -- they are used only for the `/initiat
 
 ### Session persistence
 
-`TradeRepublicSyncService.completeAuth()` stores tokens in a `TradeRepublicSession` entity. Both `sessionToken` and `refreshToken` are **encrypted at rest** with AES-256-GCM via `CryptoEncryption` before storage, and decrypted on read. The refresh token has ~2-hour validity. On sync, if the session token is expired (`SESSION_EXPIRED` error), the service attempts to refresh using the stored refresh token. If refresh also fails, the session is cleared and the user must re-authenticate. See [encryption-at-rest.md](./encryption-at-rest.md) for encryption details.
+`TradeRepublicSyncService.completeAuth()` stores tokens in a `TradeRepublicSession` entity and returns immediately with a `SessionStatusResponse`. The initial sync runs **in the background** on a daemon thread (`tr-sync`) using `TransactionTemplate` for programmatic transaction management — the background thread has no Spring-managed EntityManager, so `@Transactional` would not work.
+
+Both `sessionToken` and `refreshToken` are **encrypted at rest** with AES-256-GCM via `CryptoEncryption` before storage, and decrypted on read. The refresh token has ~2-hour validity. On sync, if the session token is expired (`SESSION_EXPIRED` error), the service attempts to refresh using the stored refresh token. If refresh also fails, the session is cleared and the user must re-authenticate. See [encryption-at-rest.md](./encryption-at-rest.md) for encryption details.
 
 ### Data fetching (WebSocket, no sidecar)
 
@@ -80,16 +82,21 @@ TRController.completeAuth() --> TRSyncService.completeAuth()
         |                             |
         |                   Save TradeRepublicSession
         |                             |
-        |                   TRAdapter.fetchAccounts(sessionToken)
-        |                             |
-        |                   WebSocket: connect -> sub availableCash
-        |                             -> sub compactPortfolio
-        |                             -> sub ticker (per ISIN)
-        |                             |
-        |                   Build TrAccountData list
-        |                             |
-        |                   Upsert accounts + holdings
+        |                   <-- SessionStatusResponse (returns immediately)
         v
+  Background thread (tr-sync, TransactionTemplate):
+        |
+        v
+  TRAdapter.fetchAccounts(sessionToken)
+        |
+        WebSocket: connect -> sub availableCash
+                  -> sub compactPortfolio
+                  -> sub ticker (per ISIN)
+        |
+        Build TrAccountData list
+        |
+        Upsert accounts + holdings
+
 SchedulerService.dailyBankSync()
         |
         v
@@ -114,6 +121,9 @@ TRAdapter.refreshSession() --> retry with new token
 | Input validation with `@NotBlank` on DTOs | Prevents null phone/PIN from reaching Map.of() constructor, which rejects nulls and throws NullPointerException | Try-catch in adapter (less clear, reactive) |
 | User-friendly error messages on frontend | HTTP errors from sidecar are technical and nested JSON; frontend parses HTTP status + error codes to show user-friendly messages in both FR and EN | Display raw API error (confusing to users) |
 | TrPosition record in port interface | Encapsulates position data (ISIN, quantity, prices) in a named record; returned within TrAccountData | Flatten positions into TrAccountData directly (less structured, harder to evolve) |
+| Async background sync after auth | Auth returns immediately (~1s), sync runs on daemon thread. Frontend gets instant feedback, data appears via refetch intervals | Synchronous sync (blocks HTTP request 10-30s, bad UX) |
+| `TransactionTemplate` for background sync | Background thread has no Spring proxy/EntityManager. Programmatic tx is the simplest fix. | `@Async` (self-invocation bypasses proxy), `@EnableAsync` (overhead for single use case) |
+| `holdingRepository.flush()` after delete | Hibernate may defer the DELETE, causing duplicate key on subsequent INSERT with same `(account_id, ticker)` | Rely on Hibernate flush ordering (unreliable) |
 
 ## Gotchas / Pitfalls
 
@@ -127,6 +137,9 @@ TRAdapter.refreshSession() --> retry with new token
 - **Multiple sub-portfolios**: The adapter extracts `secAccNo` from the JWT to subscribe to per-account compactPortfolio. If extraction fails, it falls back to a default subscription.
 - **Holding deduplication by ticker**: Multiple ISINs can map to the same ticker. When syncing, holdings are deduplicated in-memory before insertion to avoid unique constraint violations. Quantities are combined, but `averageBuyIn` is kept from the first position—a simplification, but acceptable since duplicates typically represent the same security at different stages.
 - **TrPosition currentPrice fallback**: When a ticker price is missing (ticker subscription timed out or failed), TrPosition.currentPrice is set to averageBuyIn. This allows the sync to complete without blocking on missing real-time data. Portfolio value calculation already uses this fallback logic.
+- **Background sync uses `TransactionTemplate`**: The `completeAuth` background thread runs outside Spring's proxy, so `@Transactional` has no effect. It uses `TransactionTemplate` for programmatic transaction management. If you add more background sync paths, you must wrap them in `txTemplate.executeWithoutResult()` — never rely on class-level `@Transactional` from a non-Spring thread.
+- **`holdingRepository.flush()` is required after delete**: `deleteByAccountId` does not guarantee immediate DB flush. Without an explicit `flush()` call before inserting new holdings, Hibernate may execute INSERT before DELETE, causing duplicate key violations on `(account_id, ticker)`.
+- **SyncAllModal detects TR via accounts**: TR appears in the SyncAllModal when the user has any account with `provider === "Trade Republic"`, even without an active session. When the session is expired, clicking sync opens an inline phone+PIN/TAN form. After successful auth, the backend sync runs in background and the frontend picks up results via existing `refetchInterval`.
 
 ## Tests
 

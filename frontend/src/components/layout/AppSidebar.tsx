@@ -57,11 +57,10 @@ function NavItem({
         <ItemMedia
           variant="icon"
           className={cn(
-            'flex size-10 items-center justify-center rounded-lg',
-            isActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+            'flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground',
           )}
         >
-          <Icon className="size-5" />
+          <Icon className="size-5" fill={isActive ? 'currentColor' : 'none'} />
         </ItemMedia>
         <ItemContent>
           <ItemTitle className="text-sm font-semibold">{title}</ItemTitle>
@@ -93,7 +92,7 @@ export function AppSidebar() {
   }
 
   return (
-    <nav className="flex h-fit max-h-[calc(100vh-2rem)] w-60 shrink-0 flex-col bg-background px-3 py-4 rounded-xl">
+    <nav className="hidden md:flex h-fit max-h-[calc(100vh-2rem)] w-60 shrink-0 flex-col bg-background px-3 py-4 rounded-xl">
       {/* Logo */}
       <img src={picsouLogo} alt="Picsou" className="h-7 w-auto opacity-90" />
 
@@ -114,28 +113,22 @@ export function AppSidebar() {
       {/* User dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Item asChild variant="default" className="rounded-xl px-4 py-3 cursor-pointer hover:bg-muted transition-colors">
+          <Item asChild variant="default" className="mt-3 rounded-xl px-4 py-3 cursor-pointer hover:bg-muted transition-colors">
             <button type="button">
-              <ItemMedia
-                variant="icon"
-                className="flex size-10 items-center justify-center rounded-lg bg-muted"
-              >
-                <Avatar className="size-5">
-                  <AvatarFallback className="text-[8px] font-semibold">
-                    {initial}
-                  </AvatarFallback>
-                </Avatar>
-              </ItemMedia>
+              <Avatar className="size-10 shrink-0 rounded-lg">
+                <AvatarFallback className="bg-muted text-muted-foreground text-sm font-bold">
+                  {initial}
+                </AvatarFallback>
+              </Avatar>
               <ItemContent>
                 <ItemTitle className="text-sm font-semibold">{displayName}</ItemTitle>
-                <ItemDescription className="text-xs">
-                  <ChevronsUpDown className="inline size-3" />
-                </ItemDescription>
+                <ItemDescription className="text-xs">{demoMode ? 'Demo' : t('nav.account')}</ItemDescription>
               </ItemContent>
+              <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
             </button>
           </Item>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" sideOffset={4} className="w-52">
+        <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-52">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col gap-0.5">
               <p className="text-sm font-medium leading-none">{displayName}</p>

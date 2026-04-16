@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,7 @@ public class SchedulerService {
 
     private final AccountRepository accountRepository;
     private final BalanceSnapshotRepository snapshotRepository;
+    private final AccountService accountService;
     private final SyncService syncService;
     private final TradeRepublicSyncService trSyncService;
     private final PriceService priceService;
@@ -32,6 +34,7 @@ public class SchedulerService {
     public SchedulerService(
         AccountRepository accountRepository,
         BalanceSnapshotRepository snapshotRepository,
+        AccountService accountService,
         SyncService syncService,
         TradeRepublicSyncService trSyncService,
         PriceService priceService,
@@ -40,6 +43,7 @@ public class SchedulerService {
     ) {
         this.accountRepository = accountRepository;
         this.snapshotRepository = snapshotRepository;
+        this.accountService = accountService;
         this.syncService = syncService;
         this.trSyncService = trSyncService;
         this.priceService = priceService;
@@ -73,31 +77,30 @@ public class SchedulerService {
     }
 
     /**
-     * Daily at 08:05: Take a balance snapshot for all manual accounts
-     * (so we have history even without manual updates).
+     * Daily at 08:05: Take a balance snapshot for all accounts.
      */
     @Scheduled(cron = "0 5 8 * * *")
     @Transactional
-    public void dailyManualSnapshots() {
-        log.info("Taking daily snapshots for manual accounts");
+    public void dailySnapshots() {
+        log.info("Taking daily snapshots for all accounts");
         LocalDate today = LocalDate.now();
-        List<Account> manualAccounts = accountRepository.findAllByOrderByCreatedAtAsc()
-            .stream()
-            .filter(Account::isManual)
-            .toList();
+        List<Account> allAccounts = accountRepository.findAllByOrderByCreatedAtAsc();
 
-        for (Account account : manualAccounts) {
+        for (Account account : allAccounts) {
             Optional<BalanceSnapshot> existing = snapshotRepository.findByAccountIdAndDate(account.getId(), today);
             if (existing.isEmpty()) {
+                BigDecimal balance = accountService.liveBalanceEur(account);
+                BigDecimal invested = accountService.calculateInvestedAmount(account);
                 snapshotRepository.save(BalanceSnapshot.builder()
                     .account(account)
                     .date(today)
-                    .balance(account.getCurrentBalance())
+                    .balance(balance)
+                    .investedAmount(invested)
                     .build());
             }
         }
 
-        log.debug("Snapshots taken for {} manual accounts", manualAccounts.size());
+        log.debug("Snapshots taken for {} accounts", allAccounts.size());
     }
 
     /**

@@ -1,11 +1,13 @@
 package com.picsou.controller;
 
-import com.picsou.config.FinaryProperties;
 import com.picsou.dto.FinaryApiSyncExecuteRequest;
+import com.picsou.dto.FinaryConnectionStatusResponse;
 import com.picsou.dto.FinaryImportResultResponse;
+import com.picsou.dto.FinaryLoginRequest;
 import com.picsou.dto.FinaryPreviewResponse;
 import com.picsou.finary.FinaryApiSyncService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -17,16 +19,30 @@ import org.springframework.web.bind.annotation.*;
 public class FinaryApiSyncController {
 
     private final FinaryApiSyncService finaryApiSyncService;
-    private final FinaryProperties finaryProperties;
 
     /**
-     * Check if Finary API sync is configured
+     * Get current Finary connection status
      */
-    @GetMapping("/configured")
-    public boolean isConfigured() {
-        String email = finaryProperties.getEmail();
-        String password = finaryProperties.getPassword();
-        return email != null && !email.isBlank() && password != null && !password.isBlank();
+    @GetMapping("/status")
+    public FinaryConnectionStatusResponse getStatus() {
+        return finaryApiSyncService.getConnectionStatus();
+    }
+
+    /**
+     * Store Finary credentials (encrypted)
+     */
+    @PostMapping("/login")
+    public void login(@RequestBody FinaryLoginRequest request) {
+        finaryApiSyncService.login(request.email(), request.password());
+    }
+
+    /**
+     * Delete stored Finary session
+     */
+    @DeleteMapping("/session")
+    public ResponseEntity<Void> deleteSession() {
+        finaryApiSyncService.deleteSession();
+        return ResponseEntity.noContent().build();
     }
 
     /**

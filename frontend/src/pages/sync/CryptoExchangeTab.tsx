@@ -35,6 +35,8 @@ function useAddExchange() {
       api.post('/crypto/exchange', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crypto', 'exchanges'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -45,6 +47,8 @@ function useSyncExchange() {
     mutationFn: (id: number) => api.post(`/crypto/exchange/${id}/sync`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crypto', 'exchanges'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -55,6 +59,8 @@ function useRemoveExchange() {
     mutationFn: (id: number) => api.delete(`/crypto/exchange/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crypto', 'exchanges'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }

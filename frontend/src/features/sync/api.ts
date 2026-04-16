@@ -6,6 +6,7 @@ import type {
   ExchangeStatus,
   WalletStatus,
   FinaryPreviewResponse,
+  FinaryConnectionStatus,
   FinaryAccountMapping,
   FinaryImportRequest,
   FinaryImportResultResponse,
@@ -40,6 +41,7 @@ export const bankSyncApi = {
           institutionName: string
           status: string
           authLink: string | null
+          lastSyncedAt: string | null
         }[]
       >('/sync/status')
       .then(r => r.data),
@@ -125,8 +127,14 @@ export const cryptoWalletApi = {
 // --- Finary ---
 
 export const finaryApi = {
-  isConfigured: () =>
-    api.get<boolean>('/finary/configured').then(r => r.data),
+  getStatus: () =>
+    api.get<FinaryConnectionStatus>('/finary/status').then(r => r.data),
+
+  login: (email: string, password: string) =>
+    api.post('/finary/login', { email, password }).then(r => r.data),
+
+  deleteSession: () =>
+    api.delete('/finary/session').then(r => r.data),
 
   previewFile: (file: File) => {
     const form = new FormData()

@@ -27,23 +27,25 @@
 
 | Feature | Last updated | Note |
 |---------|-------------|------|
-| Frontend utilities (lib/utils.ts) | 2026-04-08 | [frontend-utils.md](./features/frontend-utils.md) |
+| Frontend utilities (lib/utils.ts) | 2026-04-13 | [frontend-utils.md](./features/frontend-utils.md) |
 | Demo mode | 2026-04-08 | [demo-mode.md](./features/demo-mode.md) |
 | Theme (dark / light / system) | 2026-04-08 | [theme-persistence.md](./features/theme-persistence.md) |
-| Dashboard — Time range isolation | 2026-04-08 | [dashboard-time-range-isolation.md](./features/dashboard-time-range-isolation.md) |
+| Dashboard — Time range isolation | 2026-04-13 | [dashboard-time-range-isolation.md](./features/dashboard-time-range-isolation.md) |
 | Bank sync | 2026-04-04 | [bank-sync.md](./features/bank-sync.md) |
-| Trade Republic | 2026-04-08 | [trade-republic.md](./features/trade-republic.md) |
+| Trade Republic | 2026-04-12 | [trade-republic.md](./features/trade-republic.md) |
 | Trade Republic — Holdings deduplication | 2026-04-05 | [trade-republic-holding-deduplication.md](./features/trade-republic-holding-deduplication.md) |
-| ISIN → Ticker conversion | 2026-04-05 | [ISIN_TO_TICKER_CONVERSION.md](./features/ISIN_TO_TICKER_CONVERSION.md) |
+| ISIN → Ticker conversion | 2026-04-13 | [ISIN_TO_TICKER_CONVERSION.md](./features/ISIN_TO_TICKER_CONVERSION.md) |
 | Encryption at rest | 2026-04-08 | [encryption-at-rest.md](./features/encryption-at-rest.md) |
 | Crypto tracking | 2026-04-08 | [crypto-tracking.md](./features/crypto-tracking.md) |
-| Savings goals | 2026-04-04 | [goals.md](./features/goals.md) |
+| Savings goals | 2026-04-13 | [goals.md](./features/goals.md) |
 | Goals — Grid view (donuts) | 2026-04-08 | [goal-calendar-donut.md](./features/goal-calendar-donut.md) |
 | Price service | 2026-04-04 | [price-service.md](./features/price-service.md) |
-| Live prices (holdings) | 2026-04-04 | [live-prices-holdings.md](./features/live-prices-holdings.md) |
+| Live prices (holdings) | 2026-04-13 | [live-prices-holdings.md](./features/live-prices-holdings.md) |
 | Finary import | 2026-04-04 | [finary-import.md](./features/finary-import.md) |
-| Accounts overview (stacked chart + filters) | 2026-04-09 | [accounts-overview.md](./features/accounts-overview.md) |
+| Accounts overview (PnL chart + summary card + filters) | 2026-04-13 | [accounts-overview.md](./features/accounts-overview.md) |
 | Add Account modal (unified sync + manual) | 2026-04-09 | [add-account-modal.md](./features/add-account-modal.md) |
+| Docker deployment (all-in-one image) | 2026-04-16 | [docker-deployment.md](./features/docker-deployment.md) |
+| Navigation (sidebar + mobile bottom nav) | 2026-04-13 | [sidebar-navigation.md](./features/sidebar-navigation.md) |
 
 ## Conventions
 

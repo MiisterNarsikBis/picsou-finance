@@ -1,6 +1,6 @@
 # Feature: Goals
 
-> Last updated: 2026-04-08
+> Last updated: 2026-04-13
 
 ## Context
 
@@ -16,7 +16,7 @@ A `Goal` has a M:N relationship with `Account` via the `goal_account` join table
 
 `GoalService.toProgressResponse()` computes:
 
-- **currentTotal**: Sum of `currentBalanceEur` across all linked accounts (via `AccountService.toResponse()` which applies currency conversion).
+- **currentTotal**: Sum of `liveBalanceEur()` across all linked accounts. For holding accounts, this uses live prices from `PriceService` (with PnL). For cash accounts, falls back to stored balance converted to EUR.
 - **percentComplete**: `(currentTotal / targetAmount) * 100`, rounded to 4 decimal places.
 - **monthsLeft**: `ChronoUnit.MONTHS.between(today, deadline)`, minimum 0.
 - **monthlyNeeded**: `(target - currentTotal) / monthsLeft`. If deadline has passed, the entire remaining amount is the monthly need.
@@ -64,7 +64,7 @@ GoalService.create() --> save Goal with linked accounts
         v
 GoalService.toProgressResponse()
         |
-        +-- sum account balances --> currentTotal
+        +-- sum liveBalanceEur() per account --> currentTotal
         +-- compute monthsLeft, monthlyNeeded
         +-- calculateAvgMonthlyContribution() from snapshots
         +-- determine isOnTrack
@@ -97,6 +97,7 @@ GoalService.setMonthOverride(goalId, yearMonth, amount)
 | Separate override + manual contribution | Different semantics: override changes the target, manual contribution changes the actual | Single override field (loses information) |
 | 3-month average for `avgMonthlyContribution` | Short enough to reflect recent behavior, long enough to smooth out noise | 6-month or 12-month average (too slow to reflect changes) |
 | `null` for no history | Distinguishes "no data yet" from "zero contribution"; `isOnTrack` treats null as "benefit of the doubt" | Return zero (would mark new goals as "not on track") |
+| `liveBalanceEur()` for currentTotal | Holding accounts show real portfolio value with PnL, not stale sync-time balance | `AccountResponse.currentBalanceEur` (does not reflect live prices) |
 | `<Badge variant="secondary">` for account chips | Uses theme semantic tokens (luma preset); consistent with rest of the UI | Per-account pastel `<span>` with `style={{ background: a.color }}` |
 | `<Badge variant="default">` for achieved/on track status | Solid primary color; visible and unambiguous | Pastel `bg-green-500/10` (barely visible, not theme-aware) |
 

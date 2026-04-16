@@ -71,6 +71,7 @@ public class FinaryPersistenceHelper {
                 .account(account)
                 .date(today)
                 .balance(finaryAcc.balance())
+                .investedAmount(finaryAcc.balance())
                 .build());
             return 1;
         }
@@ -88,6 +89,7 @@ public class FinaryPersistenceHelper {
             .account(account)
             .date(today)
             .balance(runningBalance)
+            .investedAmount(runningBalance)
             .build());
         count++;
 
@@ -107,6 +109,7 @@ public class FinaryPersistenceHelper {
                 .account(account)
                 .date(entry.getKey())
                 .balance(entry.getValue())
+                .investedAmount(entry.getValue())
                 .build());
             count++;
         }

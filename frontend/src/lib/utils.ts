@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { useAppStore, type DateFormat } from "@/stores/app-store"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -18,8 +19,16 @@ export function formatCurrency(value: number, currency = 'EUR', locale = getLoca
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value)
 }
 
-export function formatDate(dateStr: string | null | undefined, locale = getLocale()): string {
+export function formatDate(dateStr: string | null | undefined, locale = getLocale(), format?: DateFormat): string {
   if (!dateStr) return '—'
+  const resolvedFormat = format ?? useAppStore.getState().dateFormat
+  if (resolvedFormat === 'iso') {
+    const d = new Date(dateStr)
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}-${month}-${year}`
+  }
   return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(dateStr))
 }
 

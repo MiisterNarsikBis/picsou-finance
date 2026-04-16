@@ -18,7 +18,7 @@ import {
 
 const accountSchema = z.object({
   name: z.string().min(1).max(100),
-  type: z.enum(['LEP', 'PEA', 'COMPTE_TITRES', 'CRYPTO', 'CHECKING', 'SAVINGS', 'OTHER']),
+  type: z.enum(['LEP', 'PEA', 'COMPTE_TITRES', 'CRYPTO', 'CHECKING', 'SAVINGS', 'REAL_ESTATE', 'LOAN', 'OTHER']),
   provider: z.string().max(100).optional(),
   currency: z.string().min(1).max(10),
   currentBalance: z.number().min(0).optional(),
@@ -56,6 +56,7 @@ export function AccountForm({ open, onOpenChange, onSubmit, defaultValues, title
   })
 
   const selectedColor = watch('color')
+  const selectedType = watch('type')
 
   function handleFormSubmit(data: AccountFormData) {
     onSubmit(data)
@@ -113,31 +114,48 @@ export function AccountForm({ open, onOpenChange, onSubmit, defaultValues, title
               <Input id="currency" {...register('currency')} placeholder="EUR" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="balance">{t('accounts.balance')}</Label>
+              <Label htmlFor="balance">
+                {selectedType === 'LOAN' ? t('debt.remaining') : t('accounts.balance')}
+              </Label>
               <Input id="balance" type="number" step="0.01" {...register('currentBalance', { valueAsNumber: true })} />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="provider">Provider</Label>
-              <Input id="provider" {...register('provider')} placeholder="Boursorama" />
+          {selectedType !== 'REAL_ESTATE' && selectedType !== 'LOAN' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="provider">Provider</Label>
+                <Input id="provider" {...register('provider')} placeholder="Boursorama" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ticker">Ticker</Label>
+                <Input id="ticker" {...register('ticker')} placeholder="BTC" />
+              </div>
             </div>
+          )}
+
+          {selectedType === 'LOAN' && (
             <div className="space-y-2">
-              <Label htmlFor="ticker">Ticker</Label>
-              <Input id="ticker" {...register('ticker')} placeholder="BTC" />
+              <Label htmlFor="provider">{t('debt.lenderName')}</Label>
+              <Input id="provider" {...register('provider')} placeholder={t('debt.lenderName')} />
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label>Couleur</Label>
             <ColorPicker value={selectedColor} onChange={(c) => setValue('color', c)} />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input id="isManual" type="checkbox" {...register('isManual')} className="h-4 w-4 rounded" />
-            <Label htmlFor="isManual">{t('accounts.manual')}</Label>
-          </div>
+          {selectedType !== 'REAL_ESTATE' && selectedType !== 'LOAN' && (
+            <div className="flex items-center gap-2">
+              <input id="isManual" type="checkbox" {...register('isManual')} className="h-4 w-4 rounded" />
+              <Label htmlFor="isManual">{t('accounts.manual')}</Label>
+            </div>
+          )}
+
+          {(selectedType === 'REAL_ESTATE' || selectedType === 'LOAN') && (
+            <input type="hidden" {...register('isManual')} value="true" />
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>

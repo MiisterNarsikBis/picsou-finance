@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { accountsApi } from './api'
-import type { AccountRequest, Account, HoldingResponse } from '@/types/api'
+import type { AccountRequest, Account, DebtRequest, HoldingResponse, RealEstateMetadataRequest } from '@/types/api'
 import { QUERY_STALE_TIMES } from '@/lib/constants'
 
 export interface HoldingWithAccount extends HoldingResponse {
@@ -75,8 +75,8 @@ export function usePortfolio() {
         return { ...l, priceUpdatedAt: now }
       })
 
-      // Cash accounts — aggregate into a single "Euros" line
-      const cashAccounts = accounts.filter(a => !HOLDING_ACCOUNT_TYPES.includes(a.type))
+      // Cash accounts — aggregate into a single "Euros" line (exclude LOAN accounts)
+      const cashAccounts = accounts.filter(a => !HOLDING_ACCOUNT_TYPES.includes(a.type) && a.type !== 'LOAN')
       if (cashAccounts.length > 0) {
         enriched.push({
           id: 'cash-aggregated',
@@ -215,76 +215,6 @@ export function useDeleteAccount() {
   })
 }
 
-export interface AccountsHistoryPoint {
-  date: string
-  [accountId: string]: string | number
-}
-
-export function useAllAccountsHistory() {
-  const { data: accounts, isLoading } = useAccounts()
-
-  return useQuery({
-    queryKey: ['accounts', 'all-history'],
-    queryFn: async (): Promise<AccountsHistoryPoint[]> => {
-      if (!accounts || accounts.length === 0) return []
-
-      const histories = await Promise.all(
-        accounts.map(async (account) => {
-          try {
-            const snapshots = await accountsApi.history(account.id)
-            return { account, snapshots }
-          } catch {
-            return { account, snapshots: [] }
-          }
-        }),
-      )
-
-      // Collect all unique dates
-      const dateMap = new Map<string, AccountsHistoryPoint>()
-      for (const { account, snapshots } of histories) {
-        for (const snap of snapshots) {
-          const dateStr = snap.date.slice(0, 10)
-          if (!dateMap.has(dateStr)) {
-            dateMap.set(dateStr, { date: dateStr })
-          }
-          const point = dateMap.get(dateStr)!
-          point[account.id] = snap.balance
-        }
-        // Ensure the current balance is represented at today's date
-        const today = new Date().toISOString().slice(0, 10)
-        if (!dateMap.has(today)) {
-          dateMap.set(today, { date: today })
-        }
-        const todayPoint = dateMap.get(today)!
-        if (todayPoint[account.id] === undefined) {
-          todayPoint[account.id] = account.currentBalanceEur
-        }
-      }
-
-      // Sort by date
-      const points = Array.from(dateMap.values()).sort(
-        (a, b) => a.date.localeCompare(b.date),
-      )
-
-      // Forward-fill missing values (last known balance)
-      const lastKnown = new Map<number, number>()
-      for (const point of points) {
-        for (const account of accounts) {
-          if (point[account.id] !== undefined) {
-            lastKnown.set(account.id, point[account.id] as number)
-          } else if (lastKnown.has(account.id)) {
-            point[account.id] = lastKnown.get(account.id)!
-          }
-        }
-      }
-
-      return points
-    },
-    staleTime: QUERY_STALE_TIMES.accounts,
-    enabled: !!accounts && accounts.length > 0,
-  })
-}
-
 export function useAddSnapshot() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -293,6 +223,30 @@ export function useAddSnapshot() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['accounts', id, 'history'] })
       queryClient.invalidateQueries({ queryKey: ['accounts', id] })
+    },
+  })
+}
+
+export function useUpdateRealEstateMetadata() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: RealEstateMetadataRequest }) =>
+      accountsApi.updateRealEstateMetadata(id, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['accounts', variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+export function useUpdateDebtMetadata() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: DebtRequest }) =>
+      accountsApi.updateDebtMetadata(id, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['accounts', variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }

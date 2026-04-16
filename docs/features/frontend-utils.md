@@ -1,6 +1,6 @@
 # Feature: Frontend utility library (`lib/utils.ts`)
 
-> Last updated: 2026-04-09
+> Last updated: 2026-04-13
 
 ## Context
 
@@ -20,7 +20,7 @@ Shared formatting functions used across the frontend. Centralised in one file to
 | `cn` | `(...inputs: ClassValue[]) => string` | Merges Tailwind classes via clsx + tailwind-merge |
 | `getLocale` | `() => string` | `'fr-FR'` or `'en-US'` based on `document.documentElement.lang` |
 | `formatCurrency` | `(value, currency='EUR', locale=getLocale())` | `"1 234,50 €"` |
-| `formatDate` | `(dateStr, locale=getLocale())` | `"08/04/2026"` (dd/mm/yyyy) |
+| `formatDate` | `(dateStr, locale=getLocale(), format?)` | `"08/04/2026"` (locale) or `"08-04-2026"` (iso) |
 | `formatLocalDate` | `(dateStr, locale=getLocale())` | `"8 avril 2026"` (long month) |
 | `formatPercent` | `(value, locale=getLocale())` | `"50,0 %"` — value is a ratio (0.5 → 50%) |
 | `formatTimeAgo` | `(dateStr, locale=getLocale())` | `"il y a 3 heures"` via `Intl.RelativeTimeFormat` |
@@ -34,12 +34,15 @@ Shared formatting functions used across the frontend. Centralised in one file to
 |--------|-----|----------------------|
 | `Intl.NumberFormat` / `Intl.DateTimeFormat` for all formatting | Native, locale-aware, no extra dependency | date-fns / numeral.js |
 | `Intl.RelativeTimeFormat` for `formatTimeAgo` | Locale-correct relative strings (fr/en) | Manual string building per locale |
+| `formatDate` reads `dateFormat` from Zustand store | User can toggle between locale-aware and fixed `DD-MM-YYYY` in settings | Hardcoded format — no user preference |
 | `formatPercent` takes a ratio (0–1) | Matches `Intl.NumberFormat` `style: 'percent'` convention | Percent value (0–100) — inconsistent with Intl |
 
 ## Gotchas / Pitfalls
 
 - **`getLocale()` reads `document.documentElement.lang`** — this is set by the `<html lang>` attribute. It's updated by `i18next-browser-languagedetector` on init, not on every language change. In practice, this is fine because locale changes require a page reload.
-- **`formatDate` vs `formatLocalDate`**: `formatDate` outputs `dd/mm/yyyy` (compact, for tables); `formatLocalDate` outputs long-month form (for readable labels). Don't swap them.
+- **`formatDate` vs `formatLocalDate`**: `formatDate` outputs `dd/mm/yyyy` (compact, for tables) or `DD-MM-YYYY` if the user selected the ISO format in settings; `formatLocalDate` outputs long-month form (for readable labels). Don't swap them.
+- **`formatDate` format resolution**: reads `useAppStore.getState().dateFormat` at call time (`'locale'` or `'iso'`). The optional `format` parameter overrides the store value — used by callers that need a specific format regardless of user preference.
+- **Store import in `utils.ts`**: `formatDate` imports `useAppStore` directly — safe because `app-store.ts` has no dependency on `utils.ts` (no circular dependency).
 - **`formatPercent` expects a ratio** (0.5 = 50%), not a percentage value. Passing `50` instead of `0.5` will output `"5 000 %"`.
 - **`formatDate` uses `new Date(dateStr)`** — ISO datetime strings work fine; bare date strings like `"2026-04-08"` may shift by timezone offset. Use `formatLocalDate` for LocalDate (date-only) values from the backend to avoid off-by-one-day issues.
 - **`safeRedirect` is a security guard** — always use it before redirecting to a URL from query params to prevent open redirect attacks.

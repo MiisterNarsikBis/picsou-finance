@@ -7,11 +7,20 @@ interface AccountTypeBadgeProps {
   className?: string
 }
 
+const TYPE_KEY: Partial<Record<AccountType, string>> = {
+  COMPTE_TITRES: 'compteTitres',
+  REAL_ESTATE: 'realEstate',
+}
+
+function getTypeKey(type: AccountType): string {
+  return TYPE_KEY[type] ?? type.toLowerCase()
+}
+
 export function AccountTypeBadge({ type, className }: AccountTypeBadgeProps) {
   const { t } = useTranslation()
   return (
     <Badge variant="secondary" className={className}>
-      {t(`accountTypes.${type === 'COMPTE_TITRES' ? 'compteTitres' : type.toLowerCase()}`)}
+      {t(`accountTypes.${getTypeKey(type)}`)}
     </Badge>
   )
 }

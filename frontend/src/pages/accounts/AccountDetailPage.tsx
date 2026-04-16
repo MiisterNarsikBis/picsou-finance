@@ -5,7 +5,9 @@ import {
   useAccount, useAccountHistory, useHoldingsWithLivePrices,
   useAccountTransactions, useAddSnapshot
 } from '@/features/accounts/hooks'
+import { useHistory } from '@/features/history/hooks'
 import { BalanceHistoryChart } from '@/components/shared/BalanceHistoryChart'
+import { NetWorthChart } from '@/components/shared/NetWorthChart'
 import { HoldingsTable } from '@/components/shared/HoldingsTable'
 import { TransactionsList } from '@/components/shared/TransactionsList'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
@@ -19,8 +21,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
-import { ArrowLeft, Calendar, Loader2 } from 'lucide-react'
+import { ArrowLeft, Calendar, Loader2, TrendingUp, TrendingDown } from 'lucide-react'
 import { formatLocalDate, accountTypeLabel } from '@/lib/utils'
+import { type TimeRange } from '@/components/shared/TimeRangeSelector'
 import type { BalanceSnapshot } from '@/types/api'
 
 const HOLDING_ACCOUNT_TYPES = ['PEA', 'COMPTE_TITRES', 'CRYPTO']
@@ -61,11 +64,13 @@ export function AccountDetailPage() {
   const { data: holdings } = useHoldingsWithLivePrices(accountId)
   const { data: transactions } = useAccountTransactions(accountId)
   const addSnapshot = useAddSnapshot()
+  const { data: pnlData } = useHistory(accountId ? [accountId] : [], 12)
 
   const [showHistory, setShowHistory] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
   const [modified, setModified] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
+  const [range, setRange] = useState<TimeRange>('1Y')
 
   const months = useMemo(() => getLast12Months(), [])
 
@@ -109,6 +114,20 @@ export function AccountDetailPage() {
   const chartData = (history ?? []).map(s => ({ date: s.date, balance: s.balance }))
   const showHoldings = account ? HOLDING_ACCOUNT_TYPES.includes(account.type) : false
   const recentSnapshots = [...(history ?? [])].reverse().slice(0, 10)
+
+  // Live value from holdings (with live prices) — not from stale snapshots
+  const liveTotal = holdings ? holdings.reduce((sum, h) => sum + (h.currentValueEur ?? 0), 0) : 0
+  // For holding accounts, use live total value as the displayed balance
+  const displayBalance = (showHoldings && holdings && holdings.length > 0 && liveTotal > 0)
+    ? liveTotal
+    : (account?.currentBalanceEur ?? 0)
+
+  // PnL from unified history endpoint (pre-computed by backend)
+  const pnlLatest = pnlData && pnlData.length > 0 ? pnlData[pnlData.length - 1] : null
+  const pnl = pnlLatest && pnlLatest.invested > 0 ? pnlLatest.pnl : null
+  const pnlPct = pnlLatest && pnlLatest.invested > 0
+    ? ((pnlLatest.pnl / pnlLatest.invested) * 100).toFixed(1) : null
+  const pnlPositive = pnl !== null && pnl >= 0
 
   return (
     <div className="space-y-4">
@@ -162,7 +181,7 @@ export function AccountDetailPage() {
           <CardContent>
             <p className="text-xs text-muted-foreground mb-1">{t('accounts.currentBalance')}</p>
             <CurrencyDisplay
-              value={account.currentBalanceEur}
+              value={displayBalance}
               className="text-3xl font-bold text-foreground"
             />
             {account.currency !== 'EUR' && (
@@ -171,12 +190,37 @@ export function AccountDetailPage() {
                 {account.ticker ? ` (${account.ticker})` : ''}
               </p>
             )}
+            {showHoldings && pnl !== null && (
+              <div className="mt-3 flex items-center gap-2">
+                {pnlPositive
+                  ? <TrendingUp className="text-emerald-500" size={16} />
+                  : <TrendingDown className="text-red-500" size={16} />}
+                <span className={`text-sm font-medium ${pnlPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <CurrencyDisplay value={pnl} />
+                  {pnlPct !== null && (
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      ({pnlPositive ? '+' : ''}{pnlPct}%)
+                    </span>
+                  )}
+                </span>
+                <span className="text-sm text-muted-foreground">{t('dashboard.netWorthChange')}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : null}
 
       {/* History chart */}
-      {chartData.length > 1 && (
+      {showHoldings && pnlData && pnlData.length > 1 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('dashboard.gainLoss')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <NetWorthChart data={pnlData} range={range} onRangeChange={setRange} />
+          </CardContent>
+        </Card>
+      ) : chartData.length > 1 ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('accounts.history')}</CardTitle>
@@ -185,7 +229,7 @@ export function AccountDetailPage() {
             <BalanceHistoryChart data={chartData} />
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Holdings */}
       {showHoldings && (

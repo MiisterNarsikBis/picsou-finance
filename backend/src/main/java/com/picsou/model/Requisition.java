@@ -3,6 +3,8 @@ package com.picsou.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "requisition")
 @Getter
@@ -34,4 +36,8 @@ public class Requisition extends AuditableEntity {
 
     @Column(name = "auth_link", columnDefinition = "TEXT")
     private String authLink;
+
+    /** When this connection last successfully synced */
+    @Column(name = "last_synced_at")
+    private Instant lastSyncedAt;
 }

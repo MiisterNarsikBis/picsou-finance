@@ -1,12 +1,16 @@
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useDashboard } from '@/features/dashboard/hooks'
+import { useHistory } from '@/features/history/hooks'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { NetWorthChart } from '@/components/shared/NetWorthChart'
 import { DistributionPie } from '@/components/shared/DistributionPie'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { HoldingsCard } from '@/components/shared/HoldingsCard'
+import { SyncAllModal } from '@/components/sync/SyncAllModal'
+import { type TimeRange } from '@/components/shared/TimeRangeSelector'
 import {
   Card,
   CardContent,
@@ -25,27 +29,64 @@ import {
 } from '@/components/ui/item'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { TrendingUp, TrendingDown, Plus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Plus, RefreshCw } from 'lucide-react'
 import { todayLabel } from '@/lib/utils'
+import { GoalDetailModal } from '@/pages/goals/GoalDetailModal'
 
 export function DashboardPage() {
   const { t } = useTranslation()
   const { data, isLoading } = useDashboard()
+  const [showSyncModal, setShowSyncModal] = useState(false)
+  const [range, setRange] = useState<TimeRange>('1Y')
+  const [detailGoalId, setDetailGoalId] = useState<number | null>(null)
+
+  // Derive all account IDs from dashboard distribution
+  const allAccountIds = useMemo(
+    () => data ? [...data.distribution.map(d => d.accountId), ...data.liabilities.map(l => l.accountId)] : [],
+    [data]
+  )
+  const { data: history } = useHistory(allAccountIds, 12)
+
+  const historyForRange = useMemo(() => {
+    if (!history || range === 'ALL' || history.length < 2) return history ?? []
+    const now = new Date()
+    let from: Date
+    switch (range) {
+      case '1D': from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1); break
+      case '7D': from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7); break
+      case '1M': from = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()); break
+      case '3M': from = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()); break
+      case 'YTD': from = new Date(now.getFullYear(), 0, 1); break
+      case '1Y': from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); break
+      default: return history
+    }
+    return history.filter(p => new Date(p.date) >= from)
+  }, [history, range])
 
   if (isLoading || !data) {
     return <LoadingSkeleton />
   }
 
-  const trend = data.totalNetWorth - data.previousTotal
-  const trendPct =
-    data.previousTotal > 0 ? ((trend / data.previousTotal) * 100).toFixed(1) : null
-  const trendPositive = trend >= 0
+  // PnL from the latest history point (pre-computed by backend)
+  const pnl = historyForRange.length >= 1 ? historyForRange[historyForRange.length - 1].pnl : 0
+  const pnlPct = pnl !== 0 ? ((pnl / (historyForRange[historyForRange.length - 1]?.invested ?? 1)) * 100).toFixed(1) : null
+  const pnlPositive = pnl >= 0
 
   return (
     <div className="space-y-6">
       <PageHeader
         surtitle={todayLabel()}
         title={t('dashboard.title')}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSyncModal(true)}
+          >
+            <RefreshCw className="mr-2 size-4" />
+            {t('dashboard.syncAccounts')}
+          </Button>
+        }
       />
 
       {/* Net worth hero */}
@@ -54,17 +95,31 @@ export function DashboardPage() {
           <CardTitle>{t('dashboard.netWorth')}</CardTitle>
           <CurrencyDisplay value={data.totalNetWorth} className="text-4xl font-bold" />
 
+          {(data.totalLiabilities ?? 0) > 0 && (
+            <div className="mt-2 flex items-center gap-4 text-sm">
+              <span className="text-muted-foreground">
+                {t('dashboard.totalAssets')}:
+              </span>
+              <CurrencyDisplay value={data.totalNetWorth + (data.totalLiabilities ?? 0)} />
+              <span className="text-red-500">-</span>
+              <span className="text-muted-foreground">
+                {t('dashboard.totalLiabilities')}:
+              </span>
+              <CurrencyDisplay value={data.totalLiabilities ?? 0} className="text-red-500" />
+            </div>
+          )}
+
           <div className="mt-3 flex items-center gap-2">
-            {trendPositive
+            {pnlPositive
               ? <TrendingUp className="text-emerald-500" size={18} />
               : <TrendingDown className="text-red-500" size={18} />}
             <span
-              className={`text-sm font-medium ${trendPositive ? 'text-emerald-500' : 'text-red-500'}`}
+              className={`text-sm font-medium ${pnlPositive ? 'text-emerald-500' : 'text-red-500'}`}
             >
-              <CurrencyDisplay value={trend} />
-              {trendPct !== null && (
+              <CurrencyDisplay value={pnl} />
+              {pnlPct !== null && (
                 <span className="ml-1 font-normal text-muted-foreground">
-                  ({trendPositive ? '+' : ''}{trendPct}%)
+                  ({pnlPositive ? '+' : ''}{pnlPct}%)
                 </span>
               )}
             </span>
@@ -80,7 +135,7 @@ export function DashboardPage() {
             <CardTitle>{t('dashboard.gainLoss')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <NetWorthChart data={data.netWorthHistory} />
+            <NetWorthChart data={history ?? []} range={range} onRangeChange={setRange} />
           </CardContent>
         </Card>
 
@@ -108,11 +163,15 @@ export function DashboardPage() {
             <p className="text-sm text-muted-foreground">{t('dashboard.noGoals')}</p>
           ) : (
             <ItemGroup className="gap-3">
-              {data.goalSummaries.slice(0, 3).map((goal) => (
+              {[...data.goalSummaries]
+                .sort((a, b) => b.percentComplete - a.percentComplete)
+                .slice(0, 3)
+                .map((goal) => (
                 <Item
                   key={goal.id}
                   variant="muted"
-                  className="flex-col items-stretch rounded-4xl px-4 py-3 gap-4"
+                  className="flex-col items-stretch rounded-4xl px-4 py-3 gap-4 cursor-pointer"
+                  onClick={() => setDetailGoalId(goal.id)}
                 >
                   <ItemContent className="gap-3">
                     <ItemDescription className="cn-font-heading text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -135,6 +194,13 @@ export function DashboardPage() {
                   </ItemFooter>
                 </Item>
               ))}
+              {data.goalSummaries.length > 3 && (
+                <Button variant="ghost" size="sm" className="w-full" asChild>
+                  <Link to="/goals">
+                    {t('dashboard.otherGoals', { count: data.goalSummaries.length - 3 })}
+                  </Link>
+                </Button>
+              )}
             </ItemGroup>
           )}
         </CardContent>
@@ -149,6 +215,12 @@ export function DashboardPage() {
 
       {/* Holdings overview */}
       <HoldingsCard />
+
+      {/* Sync all modal */}
+      <SyncAllModal open={showSyncModal} onOpenChange={setShowSyncModal} />
+
+      {/* Goal detail modal */}
+      <GoalDetailModal goalId={detailGoalId} onClose={() => setDetailGoalId(null)} />
     </div>
   )
 }

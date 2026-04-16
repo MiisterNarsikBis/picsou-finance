@@ -28,6 +28,7 @@
     "sync": "Sync",
     "settings": "Settings",
     "settings.desc": "Preferences & account",
+    "account": "My account",
     "logout": "Logout"
   },
   "auth": {
@@ -43,8 +44,9 @@
   "dashboard": {
     "title": "Dashboard",
     "netWorth": "Total net worth",
+    "syncAccounts": "Sync accounts",
     "invested": "Capital invested",
-    "netWorthChange": "over selected period",
+    "netWorthChange": "gain / loss",
     "distribution": "Distribution",
     "ranges": {
       "1D": "1D",
@@ -62,6 +64,7 @@
     "newGoal": "New Goal",
     "achieved": "achieved",
     "goalsSummary": "Track your progress towards your financial goals.",
+    "otherGoals": "{{count}} other goals",
     "holdings": "Holdings",
     "holdingsDescription": "Your portfolio at a glance",
     "searchHoldings": "Search holdings or tickers...",
@@ -69,7 +72,9 @@
     "shares": "shares",
     "gainLoss": "Gain / Loss",
     "recentAccounts": "Recent accounts",
-    "viewAll": "View all"
+    "viewAll": "View all",
+    "totalLiabilities": "Total liabilities",
+    "totalAssets": "Total assets"
   },
   "accounts": {
     "title": "Accounts",
@@ -94,6 +99,7 @@
     "addSnapshot": "Save",
     "monthlyHistory": "Month-end balance",
     "evolution": "Balance evolution",
+    "pnl": "Gain / Loss",
     "filters": {
       "ALL": "All",
       "STOCKS": "Stocks & Funds",
@@ -101,7 +107,8 @@
       "SAVINGS": "Savings",
       "CHECKING": "Current accounts",
       "CRYPTO": "Crypto",
-      "REAL_ESTATE": "Real estate"
+      "REAL_ESTATE": "Real estate",
+      "DEBTS": "Debts"
     }
   },
   "accountTypes": {
@@ -111,7 +118,38 @@
     "pea": "PEA",
     "compteTitres": "Brokerage",
     "crypto": "Crypto",
+    "realEstate": "Real estate",
+    "loan": "Loan",
     "other": "Other"
+  },
+  "realEstate": {
+    "purchasePrice": "Purchase price",
+    "purchaseDate": "Purchase date",
+    "surfaceArea": "Area (m²)",
+    "address": "Address",
+    "propertyType": "Property type",
+    "rentalIncome": "Monthly rent",
+    "currentValue": "Current value",
+    "appreciation": "Appreciation",
+    "propertyTypes": {
+      "APARTMENT": "Apartment",
+      "HOUSE": "House",
+      "LAND": "Land",
+      "PARKING": "Parking",
+      "COMMERCIAL": "Commercial"
+    }
+  },
+  "debt": {
+    "borrowedAmount": "Borrowed amount",
+    "interestRate": "Interest rate",
+    "monthlyPayment": "Monthly payment",
+    "lenderName": "Lender",
+    "linkedAccount": "Linked asset",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "remaining": "Remaining capital",
+    "repaid": "Capital repaid",
+    "progress": "Repayment progress"
   },
   "portfolio": {
     "title": "Detailed Portfolio",
@@ -165,7 +203,9 @@
     "of": "of",
     "clickMonthHint": "Click a month to see details",
     "noData": "—",
-    "futureMonth": "···"
+    "futureMonth": "···",
+    "linkedAccounts": "Linked accounts",
+    "history": "History"
   },
   "addAccount": {
     "title": "Add account",
@@ -200,7 +240,8 @@
       "deleteConfirm": "Remove this bank connection?",
       "callbackCompleting": "Fetching accounts...",
       "callbackDone": "Accounts synced!",
-      "callbackError": "Sync error"
+      "callbackError": "Sync error",
+      "initiateError": "Connection failed"
     },
     "tr": {
       "title": "Trade Republic",
@@ -262,7 +303,33 @@
       "accountsCreated": "Accounts created",
       "accountsMapped": "Accounts mapped",
       "accountsSkipped": "Accounts skipped",
-      "transactionsImported": "Transactions imported"
+      "transactionsImported": "Transactions imported",
+      "email": "Email",
+      "emailPlaceholder": "your@email.com",
+      "password": "Password",
+      "login": "Connect to Finary",
+      "loggingIn": "Connecting...",
+      "loginSuccess": "Connected successfully",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "lastSync": "Last sync",
+      "neverSynced": "Never",
+      "sync": "Sync now",
+      "syncing": "Syncing...",
+      "deleteConnection": "Disconnect",
+      "deleteConnectionConfirm": "Remove stored Finary credentials? Accounts already imported will be kept.",
+      "newAccounts": "New accounts detected",
+      "allAccountsMapped": "All accounts already mapped, syncing..."
+    },
+    "all": {
+      "title": "Sync accounts",
+      "syncAll": "Sync all",
+      "syncing": "Syncing...",
+      "noConnections": "No active sync connections",
+      "lastSync": "Last sync",
+      "openFinary": "Open Finary page to sync",
+      "trManualInfo": "Trade Republic is the only bank that requires manual re-authentication. You will need to re-enter your phone number and PIN each time you sync.",
+      "trSlowWarning": "Connection may take a few moments, this is normal."
     }
   },
   "settings": {
@@ -278,9 +345,10 @@
     "newPassword": "New password",
     "confirmPassword": "Confirm password",
     "passwordChanged": "Password updated",
-    "demoMode": "Demo mode",
-    "demoModeDesc": "Enable demo mode with sample data",
     "appearanceDescription": "Customize the application appearance",
+    "dateFormat": "Date format",
+    "dateFormatLocale": "Localized",
+    "dateFormatIso": "DD-MM-YYYY",
     "account": "Account",
     "accountDescription": "Manage your account",
     "username": "Username",
@@ -288,5 +356,18 @@
     "about": "About",
     "aboutDescription": "Application information",
     "version": "Version"
+  },
+  "error": {
+    "connecting": "Connecting to server...",
+    "noConnection": "Cannot connect to server",
+    "noConnectionDesc": "Make sure the server is running and try again.",
+    "degradedMode": "No connection to server. Some features may not work.",
+    "notFound": "The page you are looking for does not exist.",
+    "backToDashboard": "Back to dashboard",
+    "forbidden": "You do not have permission to access this page.",
+    "serverError": "An unexpected error occurred on the server.",
+    "crashTitle": "Something went wrong",
+    "crashDesc": "An unexpected error occurred. Please reload the page.",
+    "reload": "Reload page"
   }
 }

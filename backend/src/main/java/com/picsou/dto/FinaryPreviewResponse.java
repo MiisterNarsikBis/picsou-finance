@@ -6,5 +6,7 @@ public record FinaryPreviewResponse(
     List<FinaryAccountPreview> accounts,
     List<AccountResponse> existingPicsouAccounts,
     int totalTransactionCount,
-    String fileToken
+    String fileToken,
+    boolean autoMapped,
+    List<FinaryAccountMapping> suggestedMappings
 ) {}

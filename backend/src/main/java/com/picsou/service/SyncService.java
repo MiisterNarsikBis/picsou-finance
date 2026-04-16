@@ -97,6 +97,7 @@ public class SyncService {
             .toList();
 
         requisition.setStatus(RequisitionStatus.LINKED);
+        requisition.setLastSyncedAt(Instant.now());
         requisitionRepository.save(requisition);
 
         log.info("Completed Enable Banking sync for {}: {} accounts linked", requisition.getInstitutionName(), responses.size());
@@ -137,6 +138,7 @@ public class SyncService {
             .toList();
 
         req.setStatus(RequisitionStatus.LINKED);
+        req.setLastSyncedAt(Instant.now());
         requisitionRepository.save(req);
 
         log.info("Retry sync OK for {}: {} accounts linked", req.getInstitutionName(), responses.size());
@@ -159,8 +161,12 @@ public class SyncService {
             try {
                 List<BankConnectorPort.AccountData> accounts = bankConnector.fetchBalances(req.getRequisitionId());
                 accounts.forEach(data -> upsertAccount(data, req.getInstitutionName()));
+                req.setLastSyncedAt(Instant.now());
+                requisitionRepository.save(req);
                 log.info("Auto-resync OK for {}: {} accounts", req.getInstitutionName(), accounts.size());
             } catch (Exception ex) {
+                req.setStatus(RequisitionStatus.FAILED);
+                requisitionRepository.save(req);
                 log.warn("Auto-resync failed for {}: {}", req.getInstitutionName(), ex.getMessage());
             }
         }
@@ -177,6 +183,8 @@ public class SyncService {
         List<AccountResponse> responses = accountDataList.stream()
             .map(data -> upsertAccount(data, req.getInstitutionName()))
             .toList();
+        req.setLastSyncedAt(Instant.now());
+        requisitionRepository.save(req);
         log.info("Refreshed {} accounts for {}", responses.size(), req.getInstitutionName());
         return responses;
     }

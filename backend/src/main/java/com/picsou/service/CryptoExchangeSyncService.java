@@ -112,7 +112,23 @@ public class CryptoExchangeSyncService {
             sessionRepository.save(session);
 
             String externalId = "crypto_exchange_" + session.getExchangeType().name().toLowerCase();
-            return upsertAccount(externalId, session.getExchangeType().name(), totalEur);
+
+            // Resolve or create the account (without snapshot yet)
+            Account account = resolveAccount(externalId, session.getExchangeType().name(), totalEur);
+
+            // Persist individual holdings before snapshot (so calculateInvestedAmount finds them)
+            for (CryptoHolding holding : holdings) {
+                BigDecimal price = prices.get(holding.symbol().toUpperCase());
+                if (price != null) {
+                    accountService.upsertHolding(account.getId(), holding.symbol().toUpperCase(),
+                        holding.symbol().toUpperCase(), holding.quantity(), price);
+                }
+            }
+
+            // Now create snapshot with correct invested amount from holdings
+            accountService.upsertSnapshot(account, totalEur, LocalDate.now());
+
+            return accountService.toResponse(account);
 
         } catch (Exception ex) {
             session.setStatus("ERROR");
@@ -157,7 +173,7 @@ public class CryptoExchangeSyncService {
             .orElseThrow(() -> new SyncException("Aucun adapteur trouvé pour l'exchange : " + type));
     }
 
-    private AccountResponse upsertAccount(String externalId, String exchangeName, BigDecimal balanceEur) {
+    private Account resolveAccount(String externalId, String exchangeName, BigDecimal balanceEur) {
         Optional<Account> existing = accountRepository.findByExternalAccountId(externalId);
 
         Account account;
@@ -179,9 +195,7 @@ public class CryptoExchangeSyncService {
                 .build();
         }
 
-        account = accountRepository.save(account);
-        accountService.upsertSnapshot(account, balanceEur, LocalDate.now());
-        return accountService.toResponse(account);
+        return accountRepository.save(account);
     }
 
     public record ExchangeStatusResponse(

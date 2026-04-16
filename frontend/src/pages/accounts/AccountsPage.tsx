@@ -1,24 +1,26 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAccounts, useUpdateAccount, useDeleteAccount, useAllAccountsHistory } from '@/features/accounts/hooks'
+import { useAccounts, useUpdateAccount, useDeleteAccount } from '@/features/accounts/hooks'
+import { useHistory } from '@/features/history/hooks'
 import { AccountForm } from '@/components/shared/AccountForm'
 import { AddAccountModal } from '@/components/shared/AddAccountModal'
 import { AccountCard } from '@/components/shared/AccountCard'
 import { AccountsStackedChart } from '@/components/shared/AccountsStackedChart'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Wallet, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Wallet, Pencil, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Account, AccountRequest, AccountType } from '@/types/api'
 
-type AssetFilter = 'ALL' | 'STOCKS' | 'METALS' | 'SAVINGS' | 'CHECKING' | 'CRYPTO' | 'REAL_ESTATE'
+type AssetFilter = 'ALL' | 'STOCKS' | 'METALS' | 'SAVINGS' | 'CHECKING' | 'CRYPTO' | 'REAL_ESTATE' | 'DEBTS'
 
-const FILTER_KEYS: AssetFilter[] = ['ALL', 'STOCKS', 'METALS', 'SAVINGS', 'CHECKING', 'CRYPTO', 'REAL_ESTATE']
+const FILTER_KEYS: AssetFilter[] = ['ALL', 'STOCKS', 'METALS', 'SAVINGS', 'CHECKING', 'CRYPTO', 'REAL_ESTATE', 'DEBTS']
 
 const ASSET_FILTER_MAP: Record<AssetFilter, AccountType[] | null> = {
   ALL: null,
@@ -27,7 +29,8 @@ const ASSET_FILTER_MAP: Record<AssetFilter, AccountType[] | null> = {
   SAVINGS: ['LEP', 'SAVINGS'],
   CHECKING: ['CHECKING'],
   CRYPTO: ['CRYPTO'],
-  REAL_ESTATE: [],
+  REAL_ESTATE: ['REAL_ESTATE'],
+  DEBTS: ['LOAN'],
 }
 
 const TYPE_GROUP_META: Record<string, { key: string; labelKey: string; color: string }> = {
@@ -37,6 +40,7 @@ const TYPE_GROUP_META: Record<string, { key: string; labelKey: string; color: st
   CHECKING:    { key: 'CHECKING',    labelKey: 'accounts.filters.CHECKING',    color: '#0ea5e9' },
   CRYPTO:      { key: 'CRYPTO',      labelKey: 'accounts.filters.CRYPTO',      color: '#f97316' },
   REAL_ESTATE: { key: 'REAL_ESTATE', labelKey: 'accounts.filters.REAL_ESTATE', color: '#a855f7' },
+  DEBTS:       { key: 'DEBTS',       labelKey: 'accounts.filters.DEBTS',       color: '#ef4444' },
 }
 
 const TYPE_TO_GROUP: Record<AccountType, string> = {
@@ -47,11 +51,15 @@ const TYPE_TO_GROUP: Record<AccountType, string> = {
   SAVINGS: 'SAVINGS',
   CHECKING: 'CHECKING',
   CRYPTO: 'CRYPTO',
+  REAL_ESTATE: 'REAL_ESTATE',
+  LOAN: 'DEBTS',
 }
+
+const HOLDING_ACCOUNT_TYPES: AccountType[] = ['PEA', 'COMPTE_TITRES', 'CRYPTO']
 
 type AccountFormData = {
   name: string
-  type: 'LEP' | 'PEA' | 'COMPTE_TITRES' | 'CRYPTO' | 'CHECKING' | 'SAVINGS' | 'OTHER'
+  type: AccountType
   provider?: string
   currency: string
   currentBalance?: number
@@ -65,7 +73,6 @@ export function AccountsPage() {
   const navigate = useNavigate()
 
   const { data: accounts, isLoading } = useAccounts()
-  const { data: historyData, isLoading: isHistoryLoading } = useAllAccountsHistory()
   const updateAccount = useUpdateAccount()
   const deleteAccount = useDeleteAccount()
 
@@ -75,14 +82,54 @@ export function AccountsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [filter, setFilter] = useState<AssetFilter>('ALL')
 
+  // All account IDs for history query (split mode for per-account breakdown)
+  const allAccountIds = useMemo(() => (accounts ?? []).map(a => a.id), [accounts])
+  const { data: historyData, isLoading: isHistoryLoading } = useHistory(allAccountIds, 12, true)
+
+  // Grid accounts: always individual, filtered by type
+  const filteredAccounts = useMemo(() => {
+    if (!accounts) return []
+    const types = ASSET_FILTER_MAP[filter]
+    if (!types) return accounts
+    return accounts.filter(a => types.includes(a.type))
+  }, [accounts, filter])
+
+  // Whether current filter contains investment accounts (for PnL display)
+  const hasHoldings = filteredAccounts.some(a => HOLDING_ACCOUNT_TYPES.includes(a.type))
+
+  // Summary card values
+  const totalBalance = filteredAccounts.reduce((sum, a) =>
+    a.type === 'LOAN' ? sum - a.currentBalanceEur : sum + a.currentBalanceEur, 0)
+
+  // PnL from the latest history point for filtered accounts
+  const { pnl, pnlPct, totalInvested } = useMemo(() => {
+    if (!historyData || historyData.length === 0 || filteredAccounts.length === 0) {
+      return { pnl: 0, pnlPct: null, totalInvested: 0 }
+    }
+    const latest = historyData[historyData.length - 1]
+    if (!latest.accounts) return { pnl: 0, pnlPct: null, totalInvested: 0 }
+
+    let inv = 0
+    let pnlSum = 0
+    for (const a of filteredAccounts) {
+      const ap = latest.accounts[String(a.id)]
+      if (ap) {
+        inv += ap.invested
+        pnlSum += ap.pnl
+      }
+    }
+    const pct = inv > 0 ? ((pnlSum / inv) * 100).toFixed(1) : null
+    return { pnl: pnlSum, pnlPct: pct, totalInvested: inv }
+  }, [historyData, filteredAccounts])
+
+  const pnlPositive = pnl >= 0
+
   // Chart accounts: grouped by type when ALL, individual accounts otherwise
   const chartAccounts = useMemo(() => {
     if (!accounts) return []
     if (filter !== 'ALL') {
-      const types = ASSET_FILTER_MAP[filter]!
-      return accounts.filter(a => types.includes(a.type))
+      return accounts.filter(a => ASSET_FILTER_MAP[filter]!.includes(a.type))
     }
-    // ALL → one virtual account per type group
     return Object.values(TYPE_GROUP_META).map(meta => ({
       id: meta.key as unknown as number,
       name: t(meta.labelKey),
@@ -99,47 +146,50 @@ export function AccountsPage() {
     }))
   }, [accounts, filter, t])
 
-  // Chart history: aggregated by type group when ALL, filtered per-account otherwise
-  const chartHistory = useMemo(() => {
+  // Chart PnL data from split history
+  const chartPnlData = useMemo(() => {
     if (!historyData || !accounts) return []
+
     if (filter !== 'ALL') {
-      const types = ASSET_FILTER_MAP[filter]!
-      const ids = new Set(accounts.filter(a => types.includes(a.type)).map(a => String(a.id)))
-      return historyData.map(point => {
-        const filtered: { date: string; [key: string]: string | number } = { date: point.date }
-        for (const id of ids) {
-          if (point[id] !== undefined) filtered[id] = point[id]
-        }
-        return filtered
-      })
+      const ids = accounts
+        .filter(a => ASSET_FILTER_MAP[filter]!.includes(a.type))
+        .map(a => String(a.id))
+
+      return historyData
+        .filter(p => p.accounts)
+        .map(point => {
+          const row: { date: string; [key: string]: string | number } = { date: point.date! }
+          for (const id of ids) {
+            const ap = point.accounts![id]
+            row[id] = ap ? ap.pnl : 0
+          }
+          return row
+        })
     }
-    // ALL → sum balances per type group per date
+
+    // ALL → aggregate PnL per type group
     const groupIds: Record<string, Set<string>> = {}
     for (const a of accounts) {
       const group = TYPE_TO_GROUP[a.type]
       if (!groupIds[group]) groupIds[group] = new Set()
       groupIds[group].add(String(a.id))
     }
-    return historyData.map(point => {
-      const aggregated: { date: string; [key: string]: string | number } = { date: point.date }
-      for (const [group, ids] of Object.entries(groupIds)) {
-        let sum = 0
-        for (const id of ids) {
-          sum += (point[id] as number) ?? 0
-        }
-        aggregated[group] = sum
-      }
-      return aggregated
-    })
-  }, [historyData, accounts, filter])
 
-  // Grid accounts: always individual, filtered by type
-  const filteredAccounts = useMemo(() => {
-    if (!accounts) return []
-    const types = ASSET_FILTER_MAP[filter]
-    if (!types) return accounts
-    return accounts.filter(a => types.includes(a.type))
-  }, [accounts, filter])
+    return historyData
+      .filter(p => p.accounts)
+      .map(point => {
+        const row: { date: string; [key: string]: string | number } = { date: point.date! }
+        for (const [group, ids] of Object.entries(groupIds)) {
+          let pnlSum = 0
+          for (const id of ids) {
+            const ap = point.accounts![id]
+            if (ap) pnlSum += ap.pnl
+          }
+          row[group] = pnlSum
+        }
+        return row
+      })
+  }, [historyData, accounts, filter])
 
   function handleOpenCreate() {
     setShowCreateModal(true)
@@ -224,18 +274,45 @@ export function AccountsPage() {
             ))}
           </div>
 
+          {/* Summary card */}
           <Card>
-            <CardHeader>
-              <CardTitle>{t('accounts.evolution')}</CardTitle>
-            </CardHeader>
             <CardContent>
-              {isHistoryLoading ? (
-                <Skeleton className="h-[250px] w-full rounded-xl" />
-              ) : (
-                <AccountsStackedChart accounts={chartAccounts} data={chartHistory} />
+              <CardTitle>{t('accounts.total')}</CardTitle>
+              <CurrencyDisplay value={totalBalance} className="text-4xl font-bold" />
+              {hasHoldings && totalInvested > 0 && (
+                <div className="mt-3 flex items-center gap-2">
+                  {pnlPositive
+                    ? <TrendingUp className="text-emerald-500" size={18} />
+                    : <TrendingDown className="text-red-500" size={18} />}
+                  <span className={`text-sm font-medium ${pnlPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                    <CurrencyDisplay value={pnl} showSign />
+                    {pnlPct !== null && (
+                      <span className="ml-1 font-normal text-muted-foreground">
+                        ({pnlPositive ? '+' : ''}{pnlPct}%)
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{t('dashboard.netWorthChange')}</span>
+                </div>
               )}
             </CardContent>
           </Card>
+
+          {/* PnL chart */}
+          {hasHoldings && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('accounts.pnl')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isHistoryLoading ? (
+                  <Skeleton className="h-[250px] w-full rounded-xl" />
+                ) : (
+                  <AccountsStackedChart accounts={chartAccounts} data={chartPnlData} />
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 

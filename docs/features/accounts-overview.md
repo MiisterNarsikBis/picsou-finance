@@ -1,21 +1,29 @@
-# Feature: Accounts Overview (stacked chart + asset type filters)
+# Feature: Accounts Overview (PnL chart + summary card + asset type filters)
 
-> Last updated: 2026-04-09
+> Last updated: 2026-04-13
 
 ## Context
 
-The Accounts page (`/accounts`) only showed a flat grid of account cards. Users needed a visual overview of balance evolution over time, with the ability to filter by asset type (stocks, savings, crypto, etc.) to see both the chart and the card grid change together.
+The Accounts page (`/accounts`) shows a grid of account cards. Users need a visual overview of PnL evolution over time, with the ability to filter by asset type (stocks, savings, crypto, etc.). A summary card at top shows the total balance and PnL for the current filter, similar to the Dashboard hero card.
 
 ## How it works
 
-### Stacked chart with dual aggregation mode
+### Summary card
 
-The `AccountsStackedChart` component renders a Recharts stacked area chart. It receives an `accounts` array and a `data` array of `{ date, [id]: balance }` points. Each account becomes one stacked area using its `color`.
+A `Card` at the top of the page shows the total balance for the filtered accounts. If the current filter contains investment accounts (PEA, COMPTE_TITRES, CRYPTO), it also displays the aggregate PnL (total balance - total invested) with a green/red trend icon and percentage, using the same style as the Dashboard net worth card.
 
-The page prepares chart data differently based on the active filter:
+PnL values come from the `invested` dataset in `useAllAccountsHistory` — the last point's invested amounts are summed for all filtered accounts.
 
-- **ALL filter**: data is aggregated by asset type group (one area per group). Virtual `Account` objects are created with the group's translated label and a fixed color.
-- **Specific filter** (e.g. STOCKS): data is filtered to only include accounts of that type, shown as individual areas.
+### PnL line chart
+
+The `AccountsStackedChart` renders a Recharts `LineChart` (not stacked — PnL can be negative). Each line represents one category or account's PnL (`balance - invested`) over time.
+
+Data preparation depends on the active filter:
+
+- **ALL filter**: PnL is aggregated by asset type group (one line per group: STOCKS, CRYPTO, etc.).
+- **Specific filter** (e.g. STOCKS): PnL is computed per individual account.
+
+The chart is only rendered when `hasHoldings` is true (current filter contains investment accounts). For cash-only filters (SAVINGS, CHECKING), the chart is hidden since PnL is always 0.
 
 ### Asset type filters
 
@@ -30,17 +38,19 @@ Six asset categories defined in `AccountsPage.tsx`:
 | CRYPTO | CRYPTO | `#f97316` |
 | REAL_ESTATE | *(none yet)* | `#a855f7` |
 
-The filter affects both the chart and the account card grid simultaneously.
+The filter affects the summary card, chart, and account card grid simultaneously.
 
 ### History fetching
 
-`useAllAccountsHistory` fetches `/accounts/{id}/history` for every account in parallel, merges all snapshots into a unified time series, and forward-fills missing values (last known balance carried forward). It also injects each account's current balance at today's date if no snapshot exists for today.
+`useAllAccountsHistory` fetches `/accounts/{id}/history` for every account in parallel, merges all snapshots into a unified time series, and forward-fills missing values. It returns `{ balances, invested }` — two parallel arrays of `{ date, [accountId]: value }` points. Both are forward-filled independently.
+
+It also injects each account's current balance at today's date if no snapshot exists for today, and carries the latest known `investedAmount` forward.
 
 ### Key files
 
-- `frontend/src/pages/accounts/AccountsPage.tsx` — page with filters, chart, and grid
-- `frontend/src/components/shared/AccountsStackedChart.tsx` — stacked area chart component
-- `frontend/src/features/accounts/hooks.ts` — `useAllAccountsHistory` hook
+- `frontend/src/pages/accounts/AccountsPage.tsx` — page with summary card, PnL chart, and grid
+- `frontend/src/components/shared/AccountsStackedChart.tsx` — PnL line chart component
+- `frontend/src/features/accounts/hooks.ts` — `useAllAccountsHistory` hook (returns `AccountsHistoryData`)
 - `frontend/src/demo/index.ts` — mock history data (12 months per account)
 
 ### Flow
@@ -48,39 +58,42 @@ The filter affects both the chart and the account card grid simultaneously.
 ```
 AccountsPage
   ├─ useAccounts()                    → list of all accounts
-  ├─ useAllAccountsHistory()          → merged time series [{ date, accountId: balance }]
+  ├─ useAllAccountsHistory()          → { balances, invested } merged time series
   │
-  ├─ Filter pills (ALL / STOCKS / ...)
+  ├─ filteredAccounts (useMemo)       → accounts matching current filter
+  ├─ hasHoldings                      → true if any filtered account is investment type
   │
-  ├─ chartAccounts (useMemo)
-  │   ├─ ALL  → virtual accounts per TYPE_GROUP_META
-  │   └─ else → real accounts filtered by type
+  ├─ Summary card (totalBalance + PnL)
   │
-  ├─ chartHistory (useMemo)
-  │   ├─ ALL  → sum balances per type group per date
-  │   └─ else → keep only matching account IDs per date
+  ├─ chartPnlData (useMemo)
+  │   ├─ ALL  → aggregate (balance - invested) per type group per date
+  │   └─ else → (balance - invested) per individual account per date
   │
-  ├─ <AccountsStackedChart accounts={chartAccounts} data={chartHistory} />
+  ├─ <AccountsStackedChart> (only if hasHoldings)
   │
-  └─ filteredAccounts (useMemo) → account card grid
+  └─ Account card grid
 ```
 
 ## Technical choices
 
 | Choice | Why | Rejected alternative |
 |--------|-----|----------------------|
-| Virtual `Account` objects for type groups in ALL mode | `AccountsStackedChart` expects `Account[]` — avoids a second component or prop variant | Separate `GroupedStackedChart` component |
-| Client-side aggregation in `useMemo` | No backend endpoint for grouped history; keeps the existing per-account API | New backend endpoint `/accounts/history?grouped=true` |
-| Forward-fill missing balance values | Accounts may not have snapshots for every date; chart needs continuous data | Interpolation between points (would invent non-real values) |
-| `BalanceSnapshot` mock data expanded to 12 months | Original 3 points made the chart nearly unreadable | Generating points dynamically with random walk |
+| Virtual `Account` objects for type groups in ALL mode | `AccountsStackedChart` expects `Account[]` — avoids a second component or prop variant | Separate `GroupedChart` component |
+| Client-side PnL computation in `useMemo` | PnL = balance - invested; both already available from the hook | Backend PnL endpoint |
+| `LineChart` instead of stacked `AreaChart` | PnL can be negative — stacking breaks with negative values | Stacked areas with clamping |
+| Separate `balances` / `invested` arrays from hook | Clean separation — chart consumes computed PnL, not raw data | Single array with `inv_` prefixed keys |
+| Forward-fill missing balance and invested values | Accounts may not have snapshots for every date; chart needs continuous data | Interpolation (would invent non-real values) |
+| Hide chart for cash-only filters | SAVINGS/CHECKING have PnL = 0 — a flat line chart adds no value | Show empty chart with flat zero lines |
 
 ## Gotchas / Pitfalls
 
 - **`TYPE_TO_GROUP` must cover every `AccountType`** — if a new type is added to the enum but not to this map, those accounts silently disappear from the ALL chart.
-- **`REAL_ESTATE` maps to no `AccountType`** — it's a placeholder category for future use. The filter pill shows but the grid/chart will be empty.
-- **`Account.id` cast to `number`** — virtual group accounts use string keys (`'STOCKS'`, `'CRYPTO'`) cast as `number` via `as unknown as number`. This works because Recharts uses `dataKey` as a string lookup anyway, but it's fragile.
-- **Demo mock history uses `generateHistory()`** — a helper in `demo/index.ts` that creates 12 monthly points. The last point should match the account's `currentBalance` in `demo/data/accounts.ts` to stay consistent.
-- **`useAllAccountsHistory` is disabled when no accounts exist** (`enabled: !!accounts && accounts.length > 0`). If accounts are deleted, the query stays disabled until the accounts list refetches.
+- **`REAL_ESTATE` maps to no `AccountType`** — placeholder category. The filter pill shows but the grid/chart will be empty.
+- **`Account.id` cast to `number`** — virtual group accounts use string keys (`'STOCKS'`, `'CRYPTO'`) cast as `number` via `as unknown as number`. This works because Recharts uses `dataKey` as a string lookup, but it's fragile.
+- **`totalInvested` relies on the last invested point** — if an account has no snapshots at all, its invested amount is 0 and PnL equals its full balance. This is correct for newly created accounts where balance = invested.
+- **Cash accounts have `investedAmount = balance`** — set by `AccountService.calculateInvestedAmount()` which returns `currentBalance` for accounts without holdings. This means their PnL = 0.
+- **`useAllAccountsHistory` returns `AccountsHistoryData`** — not a flat array. Consumers must destructure `{ balances, invested }`.
+- **Demo mock history** — `generateHistory()` in `demo/index.ts` creates 12 monthly points. The last point should match the account's `currentBalance` to stay consistent.
 
 ## Tests
 
@@ -88,4 +101,6 @@ No dedicated test files for this feature yet.
 
 ## Links
 
-- i18n keys: `accounts.evolution`, `accounts.filters.*` in `en.json` / `fr.json`
+- i18n keys: `accounts.pnl`, `accounts.total`, `accounts.filters.*`, `dashboard.netWorthChange` in `en.json` / `fr.json`
+- Related: [dashboard-time-range-isolation.md](./dashboard-time-range-isolation.md) — Dashboard PnL chart
+- Related: [live-prices-holdings.md](./live-prices-holdings.md) — per-holding PnL calculation

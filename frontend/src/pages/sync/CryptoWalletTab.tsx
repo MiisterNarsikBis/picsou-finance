@@ -45,6 +45,8 @@ function useAddWallet() {
       api.post('/crypto/wallet', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crypto', 'wallets'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -55,6 +57,8 @@ function useSyncWallet() {
     mutationFn: (id: number) => api.post(`/crypto/wallet/${id}/sync`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crypto', 'wallets'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
@@ -65,6 +69,8 @@ function useRemoveWallet() {
     mutationFn: (id: number) => api.delete(`/crypto/wallet/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crypto', 'wallets'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }

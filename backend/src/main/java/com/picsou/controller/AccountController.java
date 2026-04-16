@@ -2,7 +2,13 @@ package com.picsou.controller;
 
 import com.picsou.dto.AccountRequest;
 import com.picsou.dto.AccountResponse;
+import com.picsou.dto.DebtRequest;
+import com.picsou.dto.DebtResponse;
+import com.picsou.dto.HoldingResponse;
+import com.picsou.dto.RealEstateMetadataRequest;
+import com.picsou.dto.RealEstateMetadataResponse;
 import com.picsou.dto.SnapshotRequest;
+import com.picsou.dto.TransactionResponse;
 import com.picsou.model.BalanceSnapshot;
 import com.picsou.service.AccountService;
 import jakarta.validation.Valid;
@@ -67,5 +73,31 @@ public class AccountController {
         @Valid @RequestBody SnapshotRequest req
     ) {
         return accountService.addManualSnapshot(id, req);
+    }
+
+    @GetMapping("/{id}/holdings")
+    public List<HoldingResponse> getHoldings(@PathVariable Long id) {
+        return accountService.getHoldings(id);
+    }
+
+    @GetMapping("/{id}/transactions")
+    public List<TransactionResponse> getTransactions(@PathVariable Long id) {
+        return accountService.getTransactions(id);
+    }
+
+    @PutMapping("/{id}/real-estate")
+    public RealEstateMetadataResponse updateRealEstateMetadata(
+        @PathVariable Long id,
+        @Valid @RequestBody RealEstateMetadataRequest req
+    ) {
+        return accountService.updateRealEstateMetadata(id, req);
+    }
+
+    @PutMapping("/{id}/debt")
+    public DebtResponse updateDebtMetadata(
+        @PathVariable Long id,
+        @Valid @RequestBody DebtRequest req
+    ) {
+        return accountService.updateDebtMetadata(id, req);
     }
 }

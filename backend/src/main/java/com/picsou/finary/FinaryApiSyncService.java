@@ -1,14 +1,16 @@
 package com.picsou.finary;
 
-import com.picsou.config.FinaryProperties;
+import com.picsou.config.CryptoEncryption;
 import com.picsou.dto.*;
 import com.picsou.exception.SyncException;
 import com.picsou.finary.client.FinaryApiClient;
 import com.picsou.finary.dto.FinaryAccountDto;
 import com.picsou.finary.dto.FinaryTransactionDto;
 import com.picsou.model.Account;
+import com.picsou.model.FinarySession;
 import com.picsou.model.AccountType;
 import com.picsou.repository.AccountRepository;
+import com.picsou.repository.FinarySessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -42,22 +44,78 @@ public class FinaryApiSyncService {
     );
 
     private final FinaryApiClient finaryApiClient;
-    private final FinaryProperties finaryProperties;
+    private final CryptoEncryption encryption;
     private final AccountRepository accountRepository;
+    private final FinarySessionRepository finarySessionRepository;
     private final FinaryPersistenceHelper persistenceHelper;
 
     private final ConcurrentHashMap<String, SyncSessionData> cache = new ConcurrentHashMap<>();
+
+    // ---------------------------------------------------------------------------
+    // Connection management
+    // ---------------------------------------------------------------------------
+
+    public void login(String email, String password) {
+        String encryptedEmail = encryption.encrypt(email);
+        String encryptedPassword = encryption.encrypt(password);
+
+        Optional<FinarySession> existing = finarySessionRepository.findFirstByOrderByIdAsc();
+        FinarySession session;
+        if (existing.isPresent()) {
+            session = existing.get();
+            session.setEmail(encryptedEmail);
+            session.setPassword(encryptedPassword);
+            session.setStatus("CONNECTED");
+        } else {
+            session = FinarySession.builder()
+                .email(encryptedEmail)
+                .password(encryptedPassword)
+                .status("CONNECTED")
+                .build();
+        }
+        finarySessionRepository.save(session);
+        log.info("Finary credentials stored");
+    }
+
+    public FinaryConnectionStatusResponse getConnectionStatus() {
+        Optional<FinarySession> session = finarySessionRepository.findFirstByOrderByIdAsc();
+        if (session.isEmpty()) {
+            return new FinaryConnectionStatusResponse(false, null, null, null, null);
+        }
+        FinarySession s = session.get();
+        String decryptedEmail = encryption.decrypt(s.getEmail());
+        String maskedEmail = maskEmail(decryptedEmail);
+        return new FinaryConnectionStatusResponse(true, s.getId(), s.getStatus(), s.getLastSyncedAt(), maskedEmail);
+    }
+
+    @Transactional
+    public void deleteSession() {
+        finarySessionRepository.findFirstByOrderByIdAsc()
+            .ifPresent(s -> {
+                finarySessionRepository.delete(s);
+                log.info("Finary session deleted");
+            });
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) return "***";
+        return email.charAt(0) + "***" + email.substring(atIndex);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Preview phase
+    // ---------------------------------------------------------------------------
 
     /**
      * Preview phase: authenticate, fetch all accounts + transactions, cache data, return preview.
      */
     public FinaryPreviewResponse preview(String totp) {
-        String email = finaryProperties.getEmail();
-        String password = finaryProperties.getPassword();
+        FinarySession session = finarySessionRepository.findFirstByOrderByIdAsc()
+            .orElseThrow(() -> new SyncException("Finary not connected. Please log in first."));
 
-        if (email == null || email.isBlank() || password == null || password.isBlank()) {
-            throw new SyncException("Finary credentials not configured. Set FINARY_EMAIL and FINARY_PASSWORD environment variables.");
-        }
+        String email = encryption.decrypt(session.getEmail());
+        String password = encryption.decrypt(session.getPassword());
 
         try {
             // Authenticate
@@ -139,8 +197,34 @@ public class FinaryApiSyncService {
                 .map(a -> AccountResponse.from(a, a.getCurrentBalance()))
                 .collect(Collectors.toList());
 
-            log.info("Preview ready: {} accounts, {} total transactions", allAccounts.size(), totalTx);
-            return new FinaryPreviewResponse(previews, existing, totalTx, syncToken);
+            // Auto-mapping: check if all Finary accounts already have matching Picsou accounts
+            boolean allAutoMapped = true;
+            List<FinaryAccountMapping> suggestedMappings = new ArrayList<>();
+
+            for (FinaryAccountDto acc : allAccounts) {
+                String category = findCategoryForAccount(acc, allAccounts, externalIdToCategory);
+                String externalId = "finary_" + category + "_" + acc.id();
+
+                Optional<Account> existingAccount = accountRepository.findByExternalAccountId(externalId);
+                if (existingAccount.isPresent()) {
+                    suggestedMappings.add(new FinaryAccountMapping(
+                        acc.name(), category, FinaryMappingAction.MAP_EXISTING,
+                        existingAccount.get().getId(), null
+                    ));
+                } else {
+                    allAutoMapped = false;
+                    suggestedMappings.clear();
+                    break;
+                }
+            }
+
+            // Update session status
+            session.setLastSyncedAt(Instant.now());
+            session.setStatus("CONNECTED");
+            finarySessionRepository.save(session);
+
+            log.info("Preview ready: {} accounts, {} total transactions, autoMapped={}", allAccounts.size(), totalTx, allAutoMapped);
+            return new FinaryPreviewResponse(previews, existing, totalTx, syncToken, allAutoMapped, suggestedMappings);
 
         } catch (SyncException e) {
             throw e;
@@ -149,6 +233,10 @@ public class FinaryApiSyncService {
             throw new SyncException("Finary API preview failed: " + e.getMessage(), e);
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // Execute phase
+    // ---------------------------------------------------------------------------
 
     /**
      * Execute phase: retrieve cached data, apply mappings, create/update accounts, import transactions.
@@ -196,21 +284,35 @@ public class FinaryApiSyncService {
                 accountsMapped++;
                 log.debug("Mapped account: {} -> {} (balance: {})", finaryAcc.name(), account.getName(), finaryAcc.balance());
             } else if (mapping.action() == FinaryMappingAction.CREATE_NEW) {
+                // Check if an account with this external ID already exists (upsert pattern)
+                Account existingAccount = accountRepository.findByExternalAccountId(externalId).orElse(null);
                 NewAccountDetails det = mapping.newAccount();
-                account = Account.builder()
-                    .name(det.name())
-                    .type(det.type())
-                    .provider(det.provider() != null ? det.provider() : "Finary")
-                    .currency(det.currency())
-                    .currentBalance(BigDecimal.valueOf(finaryAcc.balance() != null ? finaryAcc.balance() : 0))
-                    .isManual(true)
-                    .color(det.color() != null ? det.color() : FinaryPersistenceHelper.defaultColorForType(det.type()))
-                    .externalAccountId(externalId)
-                    .lastSyncedAt(Instant.now())
-                    .build();
-                account = accountRepository.save(account);
-                accountsCreated++;
-                log.debug("Created account: {} (balance: {})", account.getName(), finaryAcc.balance());
+
+                if (existingAccount != null) {
+                    // Update existing account instead of creating duplicate
+                    existingAccount.setCurrentBalance(BigDecimal.valueOf(finaryAcc.balance() != null ? finaryAcc.balance() : 0));
+                    existingAccount.setCurrency(finaryAcc.currency() != null ? finaryAcc.currency().code() : "EUR");
+                    existingAccount.setLastSyncedAt(Instant.now());
+                    account = accountRepository.save(existingAccount);
+                    accountsMapped++;
+                    log.debug("Upserted existing account (CREATE_NEW with existing externalId): {} (balance: {})", account.getName(), finaryAcc.balance());
+                } else {
+                    // Create new account
+                    account = Account.builder()
+                        .name(det.name())
+                        .type(det.type())
+                        .provider(det.provider() != null ? det.provider() : "Finary")
+                        .currency(det.currency())
+                        .currentBalance(BigDecimal.valueOf(finaryAcc.balance() != null ? finaryAcc.balance() : 0))
+                        .isManual(true)
+                        .color(det.color() != null ? det.color() : FinaryPersistenceHelper.defaultColorForType(det.type()))
+                        .externalAccountId(externalId)
+                        .lastSyncedAt(Instant.now())
+                        .build();
+                    account = accountRepository.save(account);
+                    accountsCreated++;
+                    log.debug("Created account: {} (balance: {})", account.getName(), finaryAcc.balance());
+                }
             }
 
             if (account != null) {
@@ -257,6 +359,10 @@ public class FinaryApiSyncService {
             0, transactionsImported, imported
         );
     }
+
+    // ---------------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------------
 
     /**
      * Fetch all transaction pages for a category (paginate until result < pageSize)

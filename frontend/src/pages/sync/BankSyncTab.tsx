@@ -59,10 +59,11 @@ export function BankSyncTab() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [callbackStatus, setCallbackStatus] = useState<CallbackStatus | null>(null)
   const [callbackError, setCallbackError] = useState<string | null>(null)
+  const [initiateError, setInitiateError] = useState<string | null>(null)
   const handledCode = useRef<string | null>(null)
 
   const completeMutation = useMutation({
-    mutationFn: (code: string) => api.post('/sync/complete', { code }).then(r => r.data),
+    mutationFn: (code: string) => api.get('/sync/complete', { params: { code } }).then(r => r.data),
     onSuccess: () => {
       setCallbackStatus('done')
       queryClient.invalidateQueries({ queryKey: ['sync', 'connections'] })
@@ -105,23 +106,32 @@ export function BankSyncTab() {
     mutationFn: (params: { institutionId: string; institutionName: string }) =>
       api.post<{ authLink: string }>('/sync/initiate', params).then(r => r.data),
     onSuccess: (data) => {
-      window.open(data.authLink, '_blank', 'noopener,noreferrer')
+      setInitiateError(null)
+      window.location.href = data.authLink
+    },
+    onError: (err: any) => {
+      const detail = err.response?.data?.detail as string | undefined
+      setInitiateError(detail || err.message || t('sync.banks.initiateError'))
     },
   })
 
   const retryMutation = useMutation({
     mutationFn: (id: number) =>
-      api.post(`/sync/connections/${id}/retry`).then(r => r.data),
+      api.post(`/sync/${id}/retry`).then(r => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sync', 'connections'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
-      api.delete(`/sync/connections/${id}`).then(r => r.data),
+      api.delete(`/sync/${id}`).then(r => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sync', 'connections'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       setDeleteId(null)
     },
   })
@@ -158,6 +168,19 @@ export function BankSyncTab() {
               {callbackStatus === 'done' && t('sync.banks.callbackDone')}
               {callbackStatus === 'error' && `${t('sync.banks.callbackError')}${callbackError ? `: ${callbackError}` : ''}`}
             </span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Initiate error */}
+      {initiateError && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 py-3">
+            <AlertTriangle className="size-4 shrink-0 text-destructive" />
+            <span className="flex-1 text-sm font-medium text-destructive">{initiateError}</span>
+            <Button variant="ghost" size="sm" onClick={() => setInitiateError(null)}>
+              {t('common.close')}
+            </Button>
           </CardContent>
         </Card>
       )}

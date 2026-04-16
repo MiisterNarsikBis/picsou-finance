@@ -82,7 +82,19 @@ public class WalletSyncService {
                 ? wallet.getLabel()
                 : wallet.getChain().name() + " Wallet";
 
-            return upsertAccount(externalId, name, balanceEur, balance.nativeSymbol());
+            // Resolve or create the account (without snapshot yet)
+            Account account = resolveAccount(externalId, name, balanceEur, balance.nativeSymbol());
+
+            // Persist holding before snapshot (so calculateInvestedAmount finds it)
+            if (priceEur != null) {
+                accountService.upsertHolding(account.getId(), balance.nativeSymbol().toUpperCase(),
+                    balance.nativeSymbol().toUpperCase(), balance.nativeAmount(), priceEur);
+            }
+
+            // Now create snapshot with correct invested amount from holding
+            accountService.upsertSnapshot(account, balanceEur, LocalDate.now());
+
+            return accountService.toResponse(account);
 
         } catch (Exception ex) {
             throw new SyncException("Sync wallet " + wallet.getChain() + " échoué : " + ex.getMessage());
@@ -125,7 +137,7 @@ public class WalletSyncService {
             .orElseThrow(() -> new SyncException("Aucun adapteur trouvé pour la chain : " + chain));
     }
 
-    private AccountResponse upsertAccount(String externalId, String name, BigDecimal balanceEur, String ticker) {
+    private Account resolveAccount(String externalId, String name, BigDecimal balanceEur, String ticker) {
         Optional<Account> existing = accountRepository.findByExternalAccountId(externalId);
 
         Account account;
@@ -133,7 +145,7 @@ public class WalletSyncService {
             account = existing.get();
             account.setCurrentBalance(balanceEur);
             account.setLastSyncedAt(Instant.now());
-            account.setTicker(null); // balance is already in EUR — no ticker-based conversion needed
+            account.setTicker(null);
         } else {
             account = Account.builder()
                 .name(name)
@@ -145,14 +157,10 @@ public class WalletSyncService {
                 .externalAccountId(externalId)
                 .isManual(false)
                 .color("#f59e0b")
-                // no .ticker() — balance is already in EUR; setting ticker would cause
-                // PriceService.toEur() to multiply by the asset price a second time
                 .build();
         }
 
-        account = accountRepository.save(account);
-        accountService.upsertSnapshot(account, balanceEur, LocalDate.now());
-        return accountService.toResponse(account);
+        return accountRepository.save(account);
     }
 
     public record WalletStatusResponse(

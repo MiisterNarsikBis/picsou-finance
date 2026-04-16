@@ -4,10 +4,13 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { Providers } from './app/providers'
 import { router } from './app/routes'
-import { initSystemThemeListener } from './lib/theme'
+import { initSystemThemeListener, applyTheme, getStoredTheme } from './lib/theme'
+import { ErrorBoundary } from './components/shared/ErrorBoundary'
+import { ConnectionGuard } from './components/shared/ConnectionGuard'
 import './index.css'
 
 initSystemThemeListener()
+applyTheme(getStoredTheme())
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')
@@ -15,7 +18,11 @@ if (!root) throw new Error('Root element not found')
 createRoot(root).render(
   <StrictMode>
     <Providers>
-      <RouterProvider router={router} />
+      <ErrorBoundary>
+        <ConnectionGuard>
+          <RouterProvider router={router} />
+        </ConnectionGuard>
+      </ErrorBoundary>
     </Providers>
   </StrictMode>
 )

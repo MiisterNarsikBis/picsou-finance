@@ -64,7 +64,7 @@ app:
     username: ${APP_USERNAME}
     password-hash: ${APP_PASSWORD_HASH}
   cors:
-    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-origins: ${ALLOWED_ORIGINS:*}
   secure-cookies: true   # set Secure flag on JWT cookies; override to false for local HTTP dev
   crypto:
     encryption-key: ${CRYPTO_ENCRYPTION_KEY:}

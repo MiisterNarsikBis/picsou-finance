@@ -43,9 +43,9 @@ public class TradeRepublicController {
         return ResponseEntity.ok(trService.initiateAuth(req.phoneNumber(), req.pin()));
     }
 
-    /** Step 2: Exchange 2FA code → session stored, accounts synced. */
+    /** Step 2: Exchange 2FA code → session stored, sync runs in background. */
     @PostMapping("/auth/complete")
-    public List<AccountResponse> completeAuth(@RequestBody CompleteAuthRequest req) {
+    public TradeRepublicSyncService.SessionStatusResponse completeAuth(@RequestBody CompleteAuthRequest req) {
         return trService.completeAuth(req.processId(), req.tan());
     }
 

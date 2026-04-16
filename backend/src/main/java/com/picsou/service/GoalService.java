@@ -1,6 +1,7 @@
 package com.picsou.service;
 
 import com.picsou.dto.AccountResponse;
+import com.picsou.dto.DashboardResponse;
 import com.picsou.dto.GoalMonthEntryResponse;
 import com.picsou.dto.GoalProgressResponse;
 import com.picsou.dto.GoalRequest;
@@ -8,9 +9,11 @@ import com.picsou.exception.ResourceNotFoundException;
 import com.picsou.model.Account;
 import com.picsou.model.BalanceSnapshot;
 import com.picsou.model.Goal;
+import com.picsou.model.GoalManualContribution;
 import com.picsou.model.GoalMonthOverride;
 import com.picsou.repository.AccountRepository;
 import com.picsou.repository.BalanceSnapshotRepository;
+import com.picsou.repository.GoalManualContributionRepository;
 import com.picsou.repository.GoalMonthOverrideRepository;
 import com.picsou.repository.GoalRepository;
 import org.springframework.stereotype.Service;
@@ -37,19 +40,25 @@ public class GoalService {
     private final BalanceSnapshotRepository snapshotRepository;
     private final AccountService accountService;
     private final GoalMonthOverrideRepository overrideRepository;
+    private final GoalManualContributionRepository manualContributionRepository;
+    private final HistoryService historyService;
 
     public GoalService(
         GoalRepository goalRepository,
         AccountRepository accountRepository,
         BalanceSnapshotRepository snapshotRepository,
         AccountService accountService,
-        GoalMonthOverrideRepository overrideRepository
+        GoalMonthOverrideRepository overrideRepository,
+        GoalManualContributionRepository manualContributionRepository,
+        HistoryService historyService
     ) {
         this.goalRepository = goalRepository;
         this.accountRepository = accountRepository;
         this.snapshotRepository = snapshotRepository;
         this.accountService = accountService;
         this.overrideRepository = overrideRepository;
+        this.manualContributionRepository = manualContributionRepository;
+        this.historyService = historyService;
     }
 
     public List<GoalProgressResponse> findAll() {
@@ -109,8 +118,9 @@ public class GoalService {
             .map(accountService::toResponse)
             .toList();
 
-        BigDecimal currentTotal = accountResponses.stream()
-            .map(AccountResponse::currentBalanceEur)
+        // Use live balance (with PnL from current prices) for each account
+        BigDecimal currentTotal = goal.getAccounts().stream()
+            .map(accountService::liveBalanceEur)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal target = goal.getTargetAmount();
@@ -179,6 +189,18 @@ public class GoalService {
         return totalContribution.divide(BigDecimal.valueOf(accountsWithData), 2, RoundingMode.HALF_UP);
     }
 
+    // ─── History ──────────────────────────────────────────────────────────────
+
+    /**
+     * Build daily history for a goal using the shared HistoryService
+     * (correct PnL with holdings cost basis + historical prices).
+     */
+    public List<DashboardResponse.NetWorthPoint> getGoalHistory(Long goalId) {
+        Goal goal = getOrThrow(goalId);
+        List<Long> accountIds = goal.getAccounts().stream().map(Account::getId).toList();
+        return historyService.buildHistory(accountIds, 12);
+    }
+
     // ─── Monthly history ──────────────────────────────────────────────────────
 
     public List<GoalMonthEntryResponse> getMonthlyEntries(Long goalId) {
@@ -187,6 +209,9 @@ public class GoalService {
 
         Map<String, BigDecimal> overrideMap = overrideRepository.findByGoalId(goalId).stream()
             .collect(Collectors.toMap(GoalMonthOverride::getYearMonth, GoalMonthOverride::getAmount));
+
+        Map<String, BigDecimal> manualMap = manualContributionRepository.findByGoalId(goalId).stream()
+            .collect(Collectors.toMap(GoalManualContribution::getYearMonth, GoalManualContribution::getAmount));
 
         YearMonth startMonth = YearMonth.from(
             goal.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()
@@ -198,9 +223,10 @@ public class GoalService {
         while (!current.isAfter(endMonth)) {
             String ym = current.toString();
             BigDecimal actual = calculateActualForMonth(goal, current);
+            BigDecimal manualActual = manualMap.get(ym);
             BigDecimal override = overrideMap.get(ym);
-            BigDecimal effective = override != null ? override : actual;
-            entries.add(new GoalMonthEntryResponse(ym, objective, actual, override, effective));
+            BigDecimal effective = override != null ? override : (manualActual != null ? manualActual : actual);
+            entries.add(new GoalMonthEntryResponse(ym, objective, actual, manualActual, override, effective));
             current = current.plusMonths(1);
         }
         return entries;
@@ -219,7 +245,9 @@ public class GoalService {
 
         BigDecimal objective = toProgressResponse(goal).monthlyNeeded();
         BigDecimal actual = calculateActualForMonth(goal, YearMonth.parse(yearMonth));
-        return new GoalMonthEntryResponse(yearMonth, objective, actual, amount, amount);
+        BigDecimal manualActual = manualContributionRepository.findByGoalIdAndYearMonth(goalId, yearMonth)
+            .map(GoalManualContribution::getAmount).orElse(null);
+        return new GoalMonthEntryResponse(yearMonth, objective, actual, manualActual, amount, amount);
     }
 
     @Transactional
@@ -229,7 +257,42 @@ public class GoalService {
         Goal goal = getOrThrow(goalId);
         BigDecimal objective = toProgressResponse(goal).monthlyNeeded();
         BigDecimal actual = calculateActualForMonth(goal, YearMonth.parse(yearMonth));
-        return new GoalMonthEntryResponse(yearMonth, objective, actual, null, actual);
+        BigDecimal manualActual = manualContributionRepository.findByGoalIdAndYearMonth(goalId, yearMonth)
+            .map(GoalManualContribution::getAmount).orElse(null);
+        BigDecimal effective = manualActual != null ? manualActual : actual;
+        return new GoalMonthEntryResponse(yearMonth, objective, actual, manualActual, null, effective);
+    }
+
+    @Transactional
+    public GoalMonthEntryResponse setManualContribution(Long goalId, String yearMonth, BigDecimal amount) {
+        Goal goal = getOrThrow(goalId);
+        GoalManualContribution entry = manualContributionRepository
+            .findByGoalIdAndYearMonth(goalId, yearMonth)
+            .orElseGet(GoalManualContribution::new);
+        entry.setGoal(goal);
+        entry.setYearMonth(yearMonth);
+        entry.setAmount(amount);
+        manualContributionRepository.save(entry);
+
+        BigDecimal objective = toProgressResponse(goal).monthlyNeeded();
+        BigDecimal actual = calculateActualForMonth(goal, YearMonth.parse(yearMonth));
+        BigDecimal override = overrideRepository.findByGoalIdAndYearMonth(goalId, yearMonth)
+            .map(GoalMonthOverride::getAmount).orElse(null);
+        BigDecimal effective = override != null ? override : amount;
+        return new GoalMonthEntryResponse(yearMonth, objective, actual, amount, override, effective);
+    }
+
+    @Transactional
+    public GoalMonthEntryResponse deleteManualContribution(Long goalId, String yearMonth) {
+        manualContributionRepository.findByGoalIdAndYearMonth(goalId, yearMonth)
+            .ifPresent(manualContributionRepository::delete);
+        Goal goal = getOrThrow(goalId);
+        BigDecimal objective = toProgressResponse(goal).monthlyNeeded();
+        BigDecimal actual = calculateActualForMonth(goal, YearMonth.parse(yearMonth));
+        BigDecimal override = overrideRepository.findByGoalIdAndYearMonth(goalId, yearMonth)
+            .map(GoalMonthOverride::getAmount).orElse(null);
+        BigDecimal effective = override != null ? override : actual;
+        return new GoalMonthEntryResponse(yearMonth, objective, actual, null, override, effective);
     }
 
     private BigDecimal calculateActualForMonth(Goal goal, YearMonth ym) {

@@ -1,5 +1,26 @@
 export type AccountType =
-  | 'LEP' | 'PEA' | 'COMPTE_TITRES' | 'CRYPTO' | 'CHECKING' | 'SAVINGS' | 'OTHER'
+  | 'LEP' | 'PEA' | 'COMPTE_TITRES' | 'CRYPTO' | 'CHECKING' | 'SAVINGS'
+  | 'REAL_ESTATE' | 'LOAN' | 'OTHER'
+
+export interface RealEstateMetadata {
+  purchasePrice: number
+  purchaseDate: string | null
+  surfaceArea: number | null
+  address: string | null
+  propertyType: string | null
+  rentalIncome: number | null
+}
+
+export interface DebtInfo {
+  linkedAccountId: number | null
+  linkedAccountName: string | null
+  borrowedAmount: number
+  interestRate: number | null
+  monthlyPayment: number | null
+  lenderName: string | null
+  startDate: string | null
+  endDate: string | null
+}
 
 export interface Account {
   id: number
@@ -14,6 +35,8 @@ export interface Account {
   color: string
   ticker: string | null
   createdAt: string
+  realEstate?: RealEstateMetadata
+  debt?: DebtInfo
 }
 
 export interface AccountRequest {
@@ -27,10 +50,30 @@ export interface AccountRequest {
   ticker?: string
 }
 
+export interface RealEstateMetadataRequest {
+  purchasePrice: number
+  purchaseDate?: string
+  surfaceArea?: number
+  address?: string
+  propertyType?: string
+  rentalIncome?: number
+}
+
+export interface DebtRequest {
+  linkedAccountId?: number | null
+  borrowedAmount: number
+  interestRate?: number
+  monthlyPayment?: number
+  lenderName?: string
+  startDate?: string
+  endDate?: string
+}
+
 export interface BalanceSnapshot {
   id: number
   date: string
   balance: number
+  investedAmount?: number
   createdAt?: string
 }
 
@@ -67,9 +110,16 @@ export interface GoalMonthEntry {
 
 export interface DashboardData {
   totalNetWorth: number
-  previousTotal: number
-  netWorthHistory: { date: string; total: number; invested: number }[]
+  totalLiabilities: number
+  netWorthHistory: { date: string; total: number; invested: number; pnl: number }[]
   distribution: {
+    accountId: number
+    name: string
+    color: string
+    balanceEur: number
+    percentage: number
+  }[]
+  liabilities: {
     accountId: number
     name: string
     color: string
@@ -139,6 +189,16 @@ export interface FinaryPreviewResponse {
   existingPicsouAccounts: Account[]
   totalTransactionCount: number
   fileToken: string
+  autoMapped?: boolean
+  suggestedMappings?: FinaryAccountMapping[]
+}
+
+export interface FinaryConnectionStatus {
+  connected: boolean
+  sessionId: number | null
+  status: string | null
+  lastSyncedAt: string | null
+  maskedEmail: string | null
 }
 
 export interface NewAccountDetails {

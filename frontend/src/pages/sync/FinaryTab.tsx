@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
 import { ACCOUNT_COLORS } from '@/lib/constants'
+import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import {
   Upload,
@@ -15,7 +16,19 @@ import {
   ArrowRight,
   CheckCircle2,
   X,
+  Loader2,
+  LogOut,
+  RefreshCw,
 } from 'lucide-react'
+import {
+  useFinaryConnectionStatus,
+  useFinaryLogin,
+  useFinaryDeleteSession,
+  usePreviewFinaryFile,
+  usePreviewFinaryApi,
+  useImportFinary,
+  useExecuteFinaryApiSync,
+} from '@/features/sync/hooks'
 import type {
   Account,
   FinaryPreviewResponse,
@@ -47,99 +60,175 @@ export function FinaryTab() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
+  const { data: connectionStatus, isLoading: statusLoading } = useFinaryConnectionStatus()
+  const loginMutation = useFinaryLogin()
+  const deleteMutation = useFinaryDeleteSession()
+  const previewFileMutation = usePreviewFinaryFile()
+  const previewApiMutation = usePreviewFinaryApi()
+  const importMutation = useImportFinary()
+  const executeApiMutation = useExecuteFinaryApiSync()
+
+  const isConnected = connectionStatus?.connected ?? false
+
+  // Wizard state
   const [step, setStep] = useState<WizardStep>(1)
+  const [isApiSync, setIsApiSync] = useState(false)
   const [previewData, setPreviewData] = useState<FinaryPreviewResponse | null>(null)
   const [mappings, setMappings] = useState<FinaryAccountMapping[]>([])
   const [importResult, setImportResult] = useState<FinaryImportResultResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // API sync state
+  // Login form state
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+
+  // TOTP state
   const [totpRequired, setTotpRequired] = useState(false)
   const [totpCode, setTotpCode] = useState('')
-  const [isApiSync, setIsApiSync] = useState(false)
 
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // File upload
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
 
-  // ----- Helpers -----
+  // ----- Login -----
 
-  function resetWizard() {
-    setStep(1)
-    setPreviewData(null)
-    setMappings([])
-    setImportResult(null)
-    setError(null)
-    setTotpRequired(false)
-    setTotpCode('')
-    setIsApiSync(false)
-  }
-
-  // ----- Step 1: Upload / API Sync -----
-
-  async function handleFileUpload(file: File) {
+  function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email || !password) return
     setLoading(true)
     setError(null)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await api.post<FinaryPreviewResponse>('/finary/preview', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      setPreviewData(res.data)
-      initMappings(res.data)
-      setIsApiSync(false)
-      setStep(2)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t('common.retry')
-      setError(msg)
-    } finally {
-      setLoading(false)
-    }
+    loginMutation.mutate(
+      { email, password },
+      {
+        onSuccess: () => {
+          setLoading(false)
+          setEmail('')
+          setPassword('')
+          // Now trigger preview with stored credentials
+          handleApiSyncPreview()
+        },
+        onError: () => setLoading(false),
+      },
+    )
   }
 
-  async function checkApiConfigured() {
+  // ----- Sync (renew) -----
+
+  function handleSync() {
     setLoading(true)
     setError(null)
-    try {
-      const res = await api.get<boolean>('/finary/configured')
-      if (res.data) {
-        await handleApiSyncPreview()
-      } else {
-        setError(t('sync.finary.apiNotConfigured'))
-      }
-    } catch {
-      setError(t('common.retry'))
-    } finally {
-      setLoading(false)
-    }
+    previewApiMutation.mutate(totpCode || undefined, {
+      onSuccess: (data) => {
+        setLoading(false)
+        setPreviewData(data)
+        initMappings(data)
+        setIsApiSync(true)
+        setTotpRequired(false)
+        setTotpCode('')
+
+        if (data.autoMapped && data.suggestedMappings) {
+          // Auto-sync: skip mapping, execute directly
+          executeWithMappings(data.fileToken, data.suggestedMappings)
+        } else {
+          setStep(2)
+        }
+      },
+      onError: (err: any) => {
+        setLoading(false)
+        if (err.response?.status === 403) {
+          setTotpRequired(true)
+        } else {
+          setError(err instanceof Error ? err.message : t('common.retry'))
+        }
+      },
+    })
   }
 
-  async function handleApiSyncPreview() {
+  function handleApiSyncPreview() {
     setLoading(true)
     setError(null)
-    try {
-      const params = totpCode ? `?totp=${encodeURIComponent(totpCode)}` : ''
-      const res = await api.post<FinaryPreviewResponse>(
-        `/finary/api-sync/preview${params}`
-      )
-      setPreviewData(res.data)
-      initMappings(res.data)
-      setIsApiSync(true)
-      setTotpRequired(false)
-      setStep(2)
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number } }
-      if (axiosErr.response?.status === 403) {
-        setTotpRequired(true)
-      } else {
-        const msg = err instanceof Error ? err.message : t('common.retry')
-        setError(msg)
-      }
-    } finally {
-      setLoading(false)
-    }
+    previewApiMutation.mutate(totpCode || undefined, {
+      onSuccess: (data) => {
+        setLoading(false)
+        setPreviewData(data)
+        initMappings(data)
+        setIsApiSync(true)
+        setTotpRequired(false)
+        setStep(2)
+      },
+      onError: (err: any) => {
+        setLoading(false)
+        if (err.response?.status === 403) {
+          setTotpRequired(true)
+        } else {
+          setError(err instanceof Error ? err.message : t('common.retry'))
+        }
+      },
+    })
   }
+
+  function executeWithMappings(token: string, mappingsToUse: FinaryAccountMapping[]) {
+    setLoading(true)
+    setError(null)
+    const mutation = isApiSync ? executeApiMutation : importMutation
+    const payload = isApiSync
+      ? { syncToken: token, mappings: mappingsToUse }
+      : { fileToken: token, mappings: mappingsToUse }
+
+    mutation.mutate(payload as any, {
+      onSuccess: (data) => {
+        setLoading(false)
+        setImportResult(data)
+        setStep(3)
+        queryClient.invalidateQueries({ queryKey: ['accounts'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      },
+      onError: (err: unknown) => {
+        setLoading(false)
+        setError(err instanceof Error ? err.message : t('common.retry'))
+      },
+    })
+  }
+
+  // ----- File upload -----
+
+  function handleFileUpload(file: File) {
+    setLoading(true)
+    setError(null)
+    previewFileMutation.mutate(file, {
+      onSuccess: (data) => {
+        setLoading(false)
+        setPreviewData(data)
+        initMappings(data)
+        setIsApiSync(false)
+        setStep(2)
+      },
+      onError: (err: unknown) => {
+        setLoading(false)
+        setError(err instanceof Error ? err.message : t('common.retry'))
+      },
+    })
+  }
+
+  function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleFileUpload(file)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFileUpload(file)
+  }
+
+  // ----- Mapping -----
 
   function initMappings(preview: FinaryPreviewResponse) {
     const initialMappings: FinaryAccountMapping[] = preview.accounts.map((account) => ({
@@ -156,30 +245,6 @@ export function FinaryTab() {
       },
     }))
     setMappings(initialMappings)
-  }
-
-  function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) handleFileUpload(file)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) handleFileUpload(file)
-  }
-
-  // ----- Step 2: Mapping -----
-
-  function updateMapping(
-    index: number,
-    patch: Partial<FinaryAccountMapping>
-  ) {
-    setMappings((prev) =>
-      prev.map((m, i) => (i === index ? { ...m, ...patch } : m))
-    )
   }
 
   function setMappingAction(index: number, action: FinaryMappingAction) {
@@ -205,77 +270,70 @@ export function FinaryTab() {
     }
   }
 
+  function updateMapping(index: number, patch: Partial<FinaryAccountMapping>) {
+    setMappings((prev) =>
+      prev.map((m, i) => (i === index ? { ...m, ...patch } : m))
+    )
+  }
+
   function updateNewAccountField(index: number, field: keyof NewAccountForm, value: string) {
     const current = mappings[index].newAccount ?? { ...defaultNewAccount }
-    updateMapping(index, {
-      newAccount: { ...current, [field]: value },
+    updateMapping(index, { newAccount: { ...current, [field]: value } })
+  }
+
+  function handleImport() {
+    if (!previewData) return
+    executeWithMappings(previewData.fileToken, mappings)
+  }
+
+  function handleDelete() {
+    deleteMutation.mutate(undefined, {
+      onSuccess: () => setShowDeleteConfirm(false),
     })
   }
 
-  async function handleImport() {
-    if (!previewData) return
-    setLoading(true)
+  function resetWizard() {
+    setStep(1)
+    setPreviewData(null)
+    setMappings([])
+    setImportResult(null)
     setError(null)
-    try {
-      const token = isApiSync ? previewData.fileToken : previewData.fileToken
-      if (isApiSync) {
-        const res = await api.post<FinaryImportResultResponse>('/finary/api-sync/execute', {
-          syncToken: token,
-          mappings,
-        })
-        setImportResult(res.data)
-      } else {
-        const res = await api.post<FinaryImportResultResponse>('/finary/import', {
-          fileToken: token,
-          mappings,
-        })
-        setImportResult(res.data)
-      }
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      setStep(3)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t('common.retry')
-      setError(msg)
-    } finally {
-      setLoading(false)
-    }
+    setTotpRequired(false)
+    setTotpCode('')
+    setIsApiSync(false)
   }
-
-  // ----- Render -----
 
   const hasSkipAll = mappings.every((m) => m.action === 'SKIP')
 
+  // ----- Render -----
+
+  if (statusLoading) {
+    return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+  }
+
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
-      <div className="flex items-center justify-center gap-2">
-        {([1, 2, 3] as const).map((s) => (
-          <div key={s} className="flex items-center gap-2">
-            <div
-              className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
-                step >= s
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {step > s ? (
-                <CheckCircle2 className="size-4" />
-              ) : (
-                s
+      {/* Connection status card */}
+      {isConnected && connectionStatus && (
+        <Card size="sm">
+          <CardContent className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-3">
+              <Badge className="bg-green-500/10 text-green-600 dark:text-green-400">
+                {t('sync.finary.connected')}
+              </Badge>
+              <span className="text-sm text-muted-foreground">{connectionStatus.maskedEmail}</span>
+              {connectionStatus.lastSyncedAt && (
+                <span className="text-xs text-muted-foreground">
+                  {t('sync.finary.lastSync')}: {formatDate(connectionStatus.lastSyncedAt)}
+                </span>
+              )}
+              {!connectionStatus.lastSyncedAt && (
+                <span className="text-xs text-muted-foreground">{t('sync.finary.neverSynced')}</span>
               )}
             </div>
-            <span className="text-sm text-muted-foreground">{t(`sync.finary.step${s}`)}</span>
-            {s < 3 && (
-              <div
-                className={`mx-1 h-px w-8 ${
-                  step > s ? 'bg-primary' : 'bg-muted'
-                }`}
-              />
-            )}
-          </div>
-        ))}
-      </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -288,15 +346,131 @@ export function FinaryTab() {
         </div>
       )}
 
-      {/* Step 1: Upload / API Sync */}
+      {/* Step indicator (when in wizard) */}
+      {(step === 2 || step === 3) && (
+        <div className="flex items-center justify-center gap-2">
+          {([1, 2, 3] as const).map((s) => (
+            <div key={s} className="flex items-center gap-2">
+              <div
+                className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
+                  step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {step > s ? <CheckCircle2 className="size-4" /> : s}
+              </div>
+              <span className="text-sm text-muted-foreground">{t(`sync.finary.step${s}`)}</span>
+              {s < 3 && <div className={`mx-1 h-px w-8 ${step > s ? 'bg-primary' : 'bg-muted'}`} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Step 1: Login form (not connected) OR Sync (connected) */}
       {step === 1 && (
         <div className="mx-auto max-w-lg space-y-4">
+          {!isConnected ? (
+            /* Login form */
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="finary-email">{t('sync.finary.email')}</Label>
+                <Input
+                  id="finary-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t('sync.finary.emailPlaceholder')}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="finary-password">{t('sync.finary.password')}</Label>
+                <div className="relative">
+                  <Input
+                    id="finary-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((p) => !p)}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <X className="size-4" /> : <span className="text-xs">•••</span>}
+                  </button>
+                </div>
+              </div>
+              <Button type="submit" disabled={loading || !email || !password} className="w-full">
+                {loading && <Loader2 className="size-4 animate-spin" />}
+                {t('sync.finary.login')}
+              </Button>
+            </form>
+          ) : (
+            /* Connected: Sync + TOTP */
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <Button onClick={handleSync} disabled={loading} className="flex-1">
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      {t('sync.finary.syncing')}
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="size-4" />
+                      {t('sync.finary.sync')}
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <LogOut className="size-4" />
+                  {t('sync.finary.deleteConnection')}
+                </Button>
+              </div>
+
+              {totpRequired && (
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Label htmlFor="finary-totp">{t('sync.finary.totp')}</Label>
+                    <Input
+                      id="finary-totp"
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value)}
+                      placeholder="000000"
+                      maxLength={6}
+                      className="mt-1"
+                    />
+                  </div>
+                  <Button
+                    className="mt-6"
+                    onClick={handleSync}
+                    disabled={totpCode.length !== 6 || loading}
+                  >
+                    <ArrowRight />
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* File upload divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">ou</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
           {/* File upload zone */}
           <div
             className={`flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${
-              dragOver
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+              dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'
             }`}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
@@ -307,65 +481,11 @@ export function FinaryTab() {
               <p className="font-medium">{t('sync.finary.uploadFile')}</p>
               <p className="mt-1 text-sm text-muted-foreground">{t('sync.finary.uploadHint')}</p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading}
-            >
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={loading}>
               <Upload />
               {t('sync.finary.uploadFile')}
             </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx"
-              className="hidden"
-              onChange={onFileSelected}
-            />
-          </div>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">ou</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          {/* API Sync */}
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={checkApiConfigured}
-              disabled={loading}
-            >
-              <Upload />
-              {t('sync.finary.apiSync')}
-            </Button>
-
-            {totpRequired && (
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Label htmlFor="finary-totp">{t('sync.finary.totp')}</Label>
-                  <Input
-                    id="finary-totp"
-                    value={totpCode}
-                    onChange={(e) => setTotpCode(e.target.value)}
-                    placeholder="000000"
-                    maxLength={6}
-                    className="mt-1"
-                  />
-                </div>
-                <Button
-                  className="mt-6"
-                  onClick={handleApiSyncPreview}
-                  disabled={totpCode.length !== 6 || loading}
-                >
-                  {t('sync.finary.next')}
-                  <ArrowRight />
-                </Button>
-              </div>
-            )}
+            <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={onFileSelected} />
           </div>
         </div>
       )}
@@ -404,40 +524,18 @@ export function FinaryTab() {
       {step === 3 && importResult && (
         <div className="mx-auto max-w-lg space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            <ResultStat
-              label={t('sync.finary.accountsCreated')}
-              value={importResult.accountsCreated}
-              color="text-emerald-600"
-            />
-            <ResultStat
-              label={t('sync.finary.accountsMapped')}
-              value={importResult.accountsMapped}
-              color="text-blue-600"
-            />
-            <ResultStat
-              label={t('sync.finary.accountsSkipped')}
-              value={importResult.accountsSkipped}
-              color="text-muted-foreground"
-            />
-            <ResultStat
-              label={t('sync.finary.transactionsImported')}
-              value={importResult.transactionsImported}
-              color="text-violet-600"
-            />
+            <ResultStat label={t('sync.finary.accountsCreated')} value={importResult.accountsCreated} color="text-emerald-600" />
+            <ResultStat label={t('sync.finary.accountsMapped')} value={importResult.accountsMapped} color="text-blue-600" />
+            <ResultStat label={t('sync.finary.accountsSkipped')} value={importResult.accountsSkipped} color="text-muted-foreground" />
+            <ResultStat label={t('sync.finary.transactionsImported')} value={importResult.transactionsImported} color="text-violet-600" />
           </div>
 
           {importResult.importedAccounts.length > 0 && (
             <Card size="sm">
               <CardContent className="space-y-2 pt-0">
                 {importResult.importedAccounts.map((account) => (
-                  <div
-                    key={account.id}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2"
-                  >
-                    <div
-                      className="size-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: account.color }}
-                    />
+                  <div key={account.id} className="flex items-center gap-3 rounded-lg px-3 py-2">
+                    <div className="size-3 shrink-0 rounded-full" style={{ backgroundColor: account.color }} />
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-sm font-medium">{account.name}</p>
                       <Badge variant="secondary">{account.type}</Badge>
@@ -457,6 +555,16 @@ export function FinaryTab() {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title={t('sync.finary.deleteConnection')}
+        description={t('sync.finary.deleteConnectionConfirm')}
+        onConfirm={handleDelete}
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }
@@ -485,7 +593,6 @@ function MappingCard({
   return (
     <Card size="sm">
       <CardContent className="space-y-3 pt-0">
-        {/* Account info row */}
         <div className="flex items-center justify-between">
           <div className="min-w-0">
             <p className="truncate font-medium">{account.finaryName}</p>
@@ -495,13 +602,10 @@ function MappingCard({
           </div>
           <div className="text-right shrink-0 ml-3">
             <CurrencyDisplay value={account.currentBalance} />
-            <p className="text-xs text-muted-foreground">
-              {account.transactionCount} tx
-            </p>
+            <p className="text-xs text-muted-foreground">{account.transactionCount} tx</p>
           </div>
         </div>
 
-        {/* Action selector */}
         <div className="flex gap-1.5">
           {(['SKIP', 'MAP_EXISTING', 'CREATE_NEW'] as const).map((action) => (
             <Button
@@ -515,7 +619,6 @@ function MappingCard({
           ))}
         </div>
 
-        {/* MAP_EXISTING: dropdown */}
         {mapping.action === 'MAP_EXISTING' && (
           <select
             className="h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
@@ -536,7 +639,6 @@ function MappingCard({
           </select>
         )}
 
-        {/* CREATE_NEW: inline form */}
         {mapping.action === 'CREATE_NEW' && mapping.newAccount && (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
