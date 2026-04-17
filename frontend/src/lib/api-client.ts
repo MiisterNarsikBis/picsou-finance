@@ -2,6 +2,7 @@ import axios from 'axios'
 import { createDemoAdapter } from '@/demo'
 import { useAppStore } from '@/stores/app-store'
 import { useConnectivityStore } from '@/stores/connectivity-store'
+import { useProfileStore } from '@/stores/profile-store'
 
 export const api = axios.create({
   baseURL: '/api',
@@ -12,6 +13,15 @@ export const api = axios.create({
 if (import.meta.env.VITE_DEMO_MODE === 'true') {
   api.defaults.adapter = createDemoAdapter()
 }
+
+// Add memberId to requests when viewing a managed profile
+api.interceptors.request.use((config) => {
+  const { activeMemberId } = useProfileStore.getState()
+  if (activeMemberId) {
+    config.params = { ...config.params, memberId: activeMemberId }
+  }
+  return config
+})
 
 let isRefreshing = false
 let refreshSubscribers: Array<() => void> = []

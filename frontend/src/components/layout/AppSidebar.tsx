@@ -8,6 +8,7 @@ import {
   LogOut,
   Languages,
   ChevronsUpDown,
+  Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -22,6 +23,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/stores/auth-store'
 import { useAppStore } from '@/stores/app-store'
+import { useProfileStore } from '@/stores/profile-store'
+import { useFamilyMembers } from '@/features/family/hooks'
 import { useLogout } from '@/features/auth/hooks'
 import { cn } from '@/lib/utils'
 import picsouLogo from '@/assets/horizontal-white-picsou.svg'
@@ -80,11 +83,15 @@ const NAV_ITEMS = [
 
 export function AppSidebar() {
   const { t, i18n } = useTranslation()
-  const username = useAuthStore((s) => s.username)
+  const user = useAuthStore((s) => s.user)
   const demoMode = useAppStore((s) => s.demoMode)
+  const { activeMemberId, setActiveMember } = useProfileStore()
+  const { data: familyMembers } = useFamilyMembers()
   const logoutMutation = useLogout()
 
-  const displayName = demoMode ? 'Demo' : username ?? ''
+  const isAdmin = user?.role === 'ADMIN'
+  const managedMembers = familyMembers?.filter((m) => m.managed) ?? []
+  const displayName = demoMode ? 'Demo' : user?.displayName ?? ''
   const initial = displayName.charAt(0).toUpperCase()
 
   function toggleLanguage() {
@@ -108,7 +115,40 @@ export function AppSidebar() {
             description={t(item.descKey)}
           />
         ))}
+
+        {/* Family view */}
+        <NavItem
+          to="/family"
+          icon={Users}
+          title={t('nav.family', 'Family')}
+          description={t('nav.family.desc', 'Shared overview')}
+        />
       </div>
+
+      {/* Profile switcher */}
+      {isAdmin && managedMembers.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {managedMembers.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setActiveMember(m.managed ? m.id : null)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                activeMemberId === m.id
+                  ? 'bg-muted font-medium'
+                  : 'text-muted-foreground hover:bg-muted/50'
+              )}
+            >
+              <Avatar className="size-6 rounded">
+                <AvatarFallback style={{ backgroundColor: m.avatarColor }} className="text-[10px] text-white">
+                  {m.displayName.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="truncate">{m.displayName}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* User dropdown */}
       <DropdownMenu>

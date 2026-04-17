@@ -1,21 +1,28 @@
 import { create } from 'zustand'
 
+interface UserData {
+  username: string
+  role: 'ADMIN' | 'MEMBER'
+  memberId: number
+  displayName: string
+}
+
 interface AuthState {
-  username: string | null
+  user: UserData | null
   isAuthenticated: boolean
-  login: (username: string) => void
+  login: (data: UserData) => void
   logout: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  username: sessionStorage.getItem('picsou_user'),
+  user: JSON.parse(sessionStorage.getItem('picsou_user') || 'null'),
   isAuthenticated: !!sessionStorage.getItem('picsou_user'),
-  login: (username) => {
-    sessionStorage.setItem('picsou_user', username)
-    set({ username, isAuthenticated: true })
+  login: (data) => {
+    sessionStorage.setItem('picsou_user', JSON.stringify(data))
+    set({ user: data, isAuthenticated: true })
   },
   logout: () => {
     sessionStorage.removeItem('picsou_user')
-    set({ username: null, isAuthenticated: false })
+    set({ user: null, isAuthenticated: false })
   },
 }))

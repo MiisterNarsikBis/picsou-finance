@@ -7,7 +7,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: ({ username, password }: { username: string; password: string }) =>
       authApi.login(username, password),
-    onSuccess: (data) => login(data.username),
+    onSuccess: (data) => login(data),
   })
 }
 

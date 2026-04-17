@@ -37,6 +37,16 @@ const SettingsPage = lazy(() =>
   }))
 )
 
+const ActivationPage = lazy(() =>
+  import('@/pages/activation/ActivationPage').then((m) => ({ default: m.ActivationPage }))
+)
+const FamilyDashboardPage = lazy(() =>
+  import('@/pages/family/FamilyDashboardPage').then((m) => ({ default: m.FamilyDashboardPage }))
+)
+const FamilySettingsPage = lazy(() =>
+  import('@/pages/settings/FamilySettingsPage').then((m) => ({ default: m.FamilySettingsPage }))
+)
+
 const NotFoundPage = lazy(() =>
   import('@/pages/error/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
 )
@@ -94,7 +104,17 @@ export const router = createBrowserRouter([
       { path: 'sync', element: <SuspensePage><SyncPage /></SuspensePage> },
       { path: 'sync/callback', element: <SuspensePage><SyncPage /></SuspensePage> },
       { path: 'settings', element: <SuspensePage><SettingsPage /></SuspensePage> },
+      { path: 'family', element: <SuspensePage><FamilyDashboardPage /></SuspensePage> },
+      { path: 'settings/family', element: <SuspensePage><FamilySettingsPage /></SuspensePage> },
     ],
+  },
+  {
+    path: '/activate/:token',
+    element: (
+      <SuspensePage>
+        <ActivationPage />
+      </SuspensePage>
+    ),
   },
   {
     path: '*',
