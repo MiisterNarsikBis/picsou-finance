@@ -20,6 +20,8 @@ import {
   Globe,
   User,
   LogOut,
+  Users,
+  ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -207,6 +209,22 @@ export function SettingsPage() {
             </Button>
           </div>
         </div>
+      </SectionCard>
+
+      {/* Family ----------------------------------------------------------- */}
+      <SectionCard
+        icon={Users}
+        title={t('settings.family', 'Family')}
+        description={t('settings.familyDescription', 'Manage members and sharing settings')}
+      >
+        <button
+          type="button"
+          onClick={() => navigate('/settings/family')}
+          className="flex w-full items-center justify-between rounded-lg p-2 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          <span>{t('settings.familyManage', 'Manage family members & sharing')}</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </button>
       </SectionCard>
 
       {/* About ------------------------------------------------------------ */}

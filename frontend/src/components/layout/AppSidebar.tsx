@@ -26,6 +26,7 @@ import { useAppStore } from '@/stores/app-store'
 import { useProfileStore } from '@/stores/profile-store'
 import { useFamilyMembers } from '@/features/family/hooks'
 import { useLogout } from '@/features/auth/hooks'
+import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import picsouLogo from '@/assets/horizontal-white-picsou.svg'
 
@@ -88,10 +89,24 @@ export function AppSidebar() {
   const { activeMemberId, setActiveMember } = useProfileStore()
   const { data: familyMembers } = useFamilyMembers()
   const logoutMutation = useLogout()
+  const queryClient = useQueryClient()
+
+  function switchProfile(memberId: number | null) {
+    setActiveMember(memberId)
+    queryClient.invalidateQueries()
+  }
 
   const isAdmin = user?.role === 'ADMIN'
   const managedMembers = familyMembers?.filter((m) => m.managed) ?? []
-  const displayName = demoMode ? 'Demo' : user?.displayName ?? ''
+
+  // Resolve active profile display (may differ from logged-in user)
+  const activeManaged = activeMemberId
+    ? managedMembers.find((m) => m.id === activeMemberId)
+    : null
+  const displayName = demoMode
+    ? 'Demo'
+    : activeManaged?.displayName ?? user?.displayName ?? ''
+  const displayColor = activeManaged?.avatarColor ?? '#6366f1'
   const initial = displayName.charAt(0).toUpperCase()
 
   function toggleLanguage() {
@@ -125,44 +140,24 @@ export function AppSidebar() {
         />
       </div>
 
-      {/* Profile switcher */}
-      {isAdmin && managedMembers.length > 0 && (
-        <div className="mt-2 space-y-1">
-          {managedMembers.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setActiveMember(m.managed ? m.id : null)}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                activeMemberId === m.id
-                  ? 'bg-muted font-medium'
-                  : 'text-muted-foreground hover:bg-muted/50'
-              )}
-            >
-              <Avatar className="size-6 rounded">
-                <AvatarFallback style={{ backgroundColor: m.avatarColor }} className="text-[10px] text-white">
-                  {m.displayName.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate">{m.displayName}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* User dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Item asChild variant="default" className="mt-3 rounded-xl px-4 py-3 cursor-pointer hover:bg-muted transition-colors">
             <button type="button">
               <Avatar className="size-10 shrink-0 rounded-lg">
-                <AvatarFallback className="bg-muted text-muted-foreground text-sm font-bold">
+                <AvatarFallback
+                  style={activeManaged ? { backgroundColor: displayColor } : undefined}
+                  className={cn('text-sm font-bold', activeManaged ? 'text-white' : 'bg-muted text-muted-foreground')}
+                >
                   {initial}
                 </AvatarFallback>
               </Avatar>
               <ItemContent>
                 <ItemTitle className="text-sm font-semibold">{displayName}</ItemTitle>
-                <ItemDescription className="text-xs">{demoMode ? 'Demo' : t('nav.account')}</ItemDescription>
+                <ItemDescription className="text-xs">
+                  {demoMode ? 'Demo' : activeManaged ? t('nav.managedProfile', 'Managed profile') : t('nav.account')}
+                </ItemDescription>
               </ItemContent>
               <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
             </button>
@@ -181,6 +176,39 @@ export function AppSidebar() {
             {t('settings.language')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          {isAdmin && managedMembers.length > 0 && (
+            <>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                {t('nav.switchProfile', 'Switch profile')}
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => switchProfile(null)}
+                className={cn(activeMemberId === null && 'bg-muted font-medium')}
+              >
+                <Avatar className="mr-2 size-5 rounded">
+                  <AvatarFallback className="bg-muted text-[9px] text-muted-foreground">
+                    {(user?.displayName ?? '').charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate">{user?.displayName ?? ''}</span>
+              </DropdownMenuItem>
+              {managedMembers.map((m) => (
+                <DropdownMenuItem
+                  key={m.id}
+                  onClick={() => switchProfile(m.id)}
+                  className={cn(activeMemberId === m.id && 'bg-muted font-medium')}
+                >
+                  <Avatar className="mr-2 size-5 rounded">
+                    <AvatarFallback style={{ backgroundColor: m.avatarColor }} className="text-[9px] text-white">
+                      {m.displayName.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{m.displayName}</span>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
             <LogOut className="mr-2 size-4" />
             {t('settings.logout')}

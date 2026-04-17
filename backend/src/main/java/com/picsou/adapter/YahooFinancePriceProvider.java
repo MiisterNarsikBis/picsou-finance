@@ -163,10 +163,12 @@ public class YahooFinancePriceProvider implements PriceProviderPort {
             List<Double> closes = result.indicators().quote().get(0).close();
 
             for (int i = 0; i < timestamps.size() && i < closes.size(); i++) {
+                Double close = closes.get(i);
+                if (close == null) continue;
                 LocalDate date = Instant.ofEpochSecond(timestamps.get(i))
                     .atZone(ZoneOffset.UTC).toLocalDate();
-                if (!date.isBefore(from) && !date.isAfter(to) && closes.get(i) > 0) {
-                    prices.put(date, BigDecimal.valueOf(closes.get(i)).setScale(8, RoundingMode.HALF_UP));
+                if (!date.isBefore(from) && !date.isAfter(to) && close > 0) {
+                    prices.put(date, BigDecimal.valueOf(close).setScale(8, RoundingMode.HALF_UP));
                 }
             }
 

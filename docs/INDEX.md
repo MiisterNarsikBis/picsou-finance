@@ -46,6 +46,7 @@
 | Add Account modal (unified sync + manual) | 2026-04-09 | [add-account-modal.md](./features/add-account-modal.md) |
 | Docker deployment (all-in-one image) | 2026-04-16 | [docker-deployment.md](./features/docker-deployment.md) |
 | Navigation (sidebar + mobile bottom nav) | 2026-04-13 | [sidebar-navigation.md](./features/sidebar-navigation.md) |
+| Multi-account family system | 2026-04-18 | [multi-account-family.md](./features/multi-account-family.md) |
 
 ## Conventions
 
