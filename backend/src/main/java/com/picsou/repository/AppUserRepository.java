@@ -14,4 +14,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     Optional<AppUser> findByIdWithMember(Long id);
 
     Optional<AppUser> findByActivationToken(String token);
+
+    Optional<AppUser> findByMemberId(Long memberId);
 }

@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface GoalManualContributionRepository extends JpaRepository<GoalManualContribution, Long> {
     List<GoalManualContribution> findByGoalId(Long goalId);
     Optional<GoalManualContribution> findByGoalIdAndYearMonth(Long goalId, String yearMonth);
+    List<GoalManualContribution> findByGoalIdAndMemberId(Long goalId, Long memberId);
 }
