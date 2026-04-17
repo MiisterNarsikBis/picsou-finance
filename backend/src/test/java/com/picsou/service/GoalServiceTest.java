@@ -29,6 +29,7 @@ class GoalServiceTest {
     @Mock BalanceSnapshotRepository snapshotRepository;
     @Mock AccountService accountService;
     @Mock GoalMonthOverrideRepository overrideRepository;
+    @Mock PriceService priceService;
 
     @InjectMocks GoalService goalService;
 
@@ -58,6 +59,7 @@ class GoalServiceTest {
                 null, true, "#6366f1", null, null, null, null
             )
         );
+        when(accountService.liveBalanceEur(account)).thenReturn(new BigDecimal("5000"));
         when(snapshotRepository.findRecentByAccountId(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.any()
