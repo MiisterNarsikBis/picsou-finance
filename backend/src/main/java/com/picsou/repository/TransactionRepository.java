@@ -14,6 +14,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     void deleteByAccountId(Long accountId);
 
+    void deleteByAccountIdAndIsManualFalse(Long accountId);
+
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.account.id = :accountId AND t.date > :date")
     BigDecimal sumAmountByAccountIdAndDateAfter(@Param("accountId") Long accountId, @Param("date") LocalDate date);
 

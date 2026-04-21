@@ -46,4 +46,21 @@ public class Transaction {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    @Column(name = "is_manual", nullable = false)
+    @Builder.Default
+    private boolean isManual = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tx_type", length = 20)
+    private TransactionType txType;
+
+    @Column(name = "ticker", length = 30)
+    private String ticker;
+
+    @Column(name = "quantity", precision = 20, scale = 8)
+    private BigDecimal quantity;
+
+    @Column(name = "price_per_unit", precision = 20, scale = 8)
+    private BigDecimal pricePerUnit;
 }

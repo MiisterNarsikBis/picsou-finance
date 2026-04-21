@@ -1,6 +1,7 @@
 package com.picsou.dto;
 
 import com.picsou.model.Transaction;
+import com.picsou.model.TransactionType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,7 +15,12 @@ public record TransactionResponse(
     String type,
     String category,
     String nativeCurrency,
-    Instant createdAt
+    Instant createdAt,
+    boolean isManual,
+    TransactionType txType,
+    String ticker,
+    BigDecimal quantity,
+    BigDecimal pricePerUnit
 ) {
     public static TransactionResponse from(Transaction t) {
         return new TransactionResponse(
@@ -25,7 +31,12 @@ public record TransactionResponse(
             t.getType(),
             t.getCategory(),
             t.getNativeCurrency(),
-            t.getCreatedAt()
+            t.getCreatedAt(),
+            t.isManual(),
+            t.getTxType(),
+            t.getTicker(),
+            t.getQuantity(),
+            t.getPricePerUnit()
         );
     }
 }
