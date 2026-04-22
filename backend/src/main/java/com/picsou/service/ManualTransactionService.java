@@ -63,12 +63,8 @@ public class ManualTransactionService {
         Account account = accountRepository.findByIdAndMemberId(accountId, memberId)
             .orElseThrow(() -> ResourceNotFoundException.account(accountId));
 
-        Transaction tx = transactionRepository.findById(txId)
+        Transaction tx = transactionRepository.findByIdAndAccountId(txId, account.getId())
             .orElseThrow(() -> ResourceNotFoundException.transaction(txId));
-
-        if (!tx.getAccount().getId().equals(account.getId())) {
-            throw ResourceNotFoundException.transaction(txId);
-        }
 
         if (!tx.isManual()) {
             throw new IllegalArgumentException("Cannot delete a synced transaction");
@@ -85,10 +81,7 @@ public class ManualTransactionService {
     }
 
     private void recomputeCashBalance(Account account) {
-        BigDecimal sum = transactionRepository.findByAccountIdOrderByDateDesc(account.getId())
-            .stream()
-            .map(Transaction::getAmount)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sum = transactionRepository.sumAmountByAccountId(account.getId());
         account.setCurrentBalance(sum);
         accountRepository.save(account);
     }

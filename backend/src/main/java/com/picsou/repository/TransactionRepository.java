@@ -9,9 +9,15 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     List<Transaction> findByAccountIdOrderByDateDesc(Long accountId);
+
+    Optional<Transaction> findByIdAndAccountId(Long id, Long accountId);
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.account.id = :accountId")
+    BigDecimal sumAmountByAccountId(@Param("accountId") Long accountId);
 
     void deleteByAccountId(Long accountId);
 
