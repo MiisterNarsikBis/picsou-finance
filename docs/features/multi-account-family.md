@@ -1,6 +1,6 @@
 # Feature: Multi-account family system
 
-> Last updated: 2026-04-18
+> Last updated: 2026-04-22
 
 ## Context
 
@@ -49,6 +49,17 @@ The `FamilyViewService` aggregates shared data for the family dashboard.
 5. `AppUser.isManaged` is set to false, `isActivated` to true
 6. The person can now log in independently
 
+Once activated, a managed member becomes **independent** (`isManaged=true && hasLogin && activated`). The admin can no longer delete their profile or regenerate their activation link. `FamilyService.deleteMember()` enforces this with a 403 guard.
+
+### Username change
+
+`PATCH /api/auth/username` updates the username of the currently authenticated user:
+1. Validates format and uniqueness (409 if taken)
+2. Updates `AppUser.username`
+3. **Re-issues both JWT cookies** (access + refresh) with the new username as subject
+
+Step 3 is critical: without it, the next request would fail because the old JWT still contains the old username, which no longer exists in the DB.
+
 ### Key files
 
 **Backend:**
@@ -72,6 +83,7 @@ The `FamilyViewService` aggregates shared data for the family dashboard.
 - `pages/settings/FamilySettingsPage.tsx` — member management + sharing config UI
 - `pages/family/FamilyDashboardPage.tsx` — shared overview
 - `pages/activation/ActivationPage.tsx` — activation flow for new members
+- `pages/settings/SettingsPage.tsx` — username edit inline (pencil → input → save)
 
 **Migrations:**
 - `V20__create_family_system.sql` — creates family_member, sharing_settings, shared_resource, goal_contributor tables; adds member_id to all owner tables
@@ -107,6 +119,9 @@ Admin clicks managed profile in sidebar dropdown
 - **PG native enum columns**: PostgreSQL enum types (`sharing_level`, `requisition_status`, `account_type`) require `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`. Without it, Hibernate sends a varchar and PG rejects the INSERT/UPDATE.
 - **Admin-only endpoints**: `FamilyController` member management methods call `requireAdmin()`. If a non-admin hits these, they get 403. The frontend must guard UI accordingly (currently checks `user?.role === 'ADMIN'`).
 - **Stale auth store**: The frontend caches user info (including role) at login time. Changing role in DB requires re-login to take effect in the UI.
+- **Username change requires token rotation**: `PATCH /api/auth/username` must re-issue the JWT cookies. If you only update the DB row, the existing tokens still carry the old username — the filter can't find the user → immediate 401 on next request.
+- **`isIndependent` in frontend must include `managed`**: The display logic for a member's status in `FamilySettingsPage` uses `isIndependent = member.managed && member.hasLogin && member.activated`. Without `managed`, admin users (who are also `hasLogin && activated`) would show "Compte indépendant" instead of "Administrateur".
+- **Cannot delete an activated member**: `FamilyService.deleteMember()` throws 403 if the target member has an activated `AppUser`. The UI hides the delete button for `isIndependent` members, but the backend is the authoritative guard.
 - **Yahoo Finance null closes**: Yahoo can return `null` in historical price arrays for non-trading days. Must check `close == null` before unboxing to avoid NPE.
 - **Profile switch cache**: TanStack Query cache is global. Without `invalidateQueries()` on switch, the old member's data persists visually.
 
