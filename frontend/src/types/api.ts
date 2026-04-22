@@ -255,6 +255,12 @@ export interface FinaryImportResultResponse {
   importedAccounts: ImportedAccountSummary[]
 }
 
+export interface FinaryAutoSyncResponse {
+  status: 'OK' | 'NEEDS_MAPPING' | 'TOTP_REQUIRED' | 'NOT_CONNECTED'
+  accountsSynced: number
+  newAccountCount: number
+}
+
 export interface Transaction {
   id: number
   date: string

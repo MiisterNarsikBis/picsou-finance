@@ -5,6 +5,7 @@ import {
   cryptoExchangeApi,
   cryptoWalletApi,
   finaryApi,
+  boursoApi,
 } from './api'
 import type {
   ExchangeType,
@@ -22,6 +23,7 @@ export const syncKeys = {
   banks: () => [...syncKeys.all, 'banks'] as const,
   institutions: (q: string) => [...syncKeys.all, 'institutions', q] as const,
   tr: () => [...syncKeys.all, 'tr'] as const,
+  bourso: () => [...syncKeys.all, 'bourso'] as const,
   exchanges: () => [...syncKeys.all, 'exchanges'] as const,
   wallets: () => [...syncKeys.all, 'wallets'] as const,
   finary: () => [...syncKeys.all, 'finary'] as const,
@@ -160,6 +162,51 @@ export function useClearTrSession() {
     mutationFn: () => trApi.clearSession(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.tr() })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// BoursoBank
+// ---------------------------------------------------------------------------
+
+export function useBoursoSessionStatus() {
+  return useQuery({
+    queryKey: syncKeys.bourso(),
+    queryFn: boursoApi.getStatus,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+}
+
+export function useInitiateBoursoAuth() {
+  return useMutation({
+    mutationFn: ({ customerId, password }: { customerId: string; password: string }) =>
+      boursoApi.initiateAuth(customerId, password),
+  })
+}
+
+export function useCompleteBoursoAuth() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ processId, code }: { processId: string; code: string }) =>
+      boursoApi.completeAuth(processId, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: syncKeys.bourso() })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+export function useSyncBourso() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => boursoApi.sync(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: syncKeys.bourso() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
@@ -333,6 +380,20 @@ export function useExecuteFinaryApiSync() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+export function useFinaryAutoSync() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (totp?: string) => finaryApi.autoSync(totp),
+    onSuccess: (data) => {
+      if (data.status === 'OK') {
+        queryClient.invalidateQueries({ queryKey: ['accounts'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+        queryClient.invalidateQueries({ queryKey: syncKeys.finary() })
+      }
     },
   })
 }

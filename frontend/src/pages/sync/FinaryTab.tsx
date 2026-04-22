@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { ACCOUNT_COLORS } from '@/lib/constants'
 import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ import {
   usePreviewFinaryApi,
   useImportFinary,
   useExecuteFinaryApiSync,
+  useFinaryAutoSync,
 } from '@/features/sync/hooks'
 import type {
   Account,
@@ -36,6 +38,7 @@ import type {
   FinaryImportResultResponse,
   FinaryMappingAction,
   AccountType,
+  FinaryAutoSyncResponse,
 } from '@/types/api'
 
 type WizardStep = 1 | 2 | 3
@@ -67,6 +70,7 @@ export function FinaryTab() {
   const previewApiMutation = usePreviewFinaryApi()
   const importMutation = useImportFinary()
   const executeApiMutation = useExecuteFinaryApiSync()
+  const autoSyncMutation = useFinaryAutoSync()
 
   const isConnected = connectionStatus?.connected ?? false
 
@@ -117,7 +121,30 @@ export function FinaryTab() {
     )
   }
 
-  // ----- Sync (renew) -----
+  // ----- Auto-sync (primary path when connected) -----
+
+  function handleAutoSync() {
+    setLoading(true)
+    setError(null)
+    autoSyncMutation.mutate(undefined, {
+      onSuccess: (data: FinaryAutoSyncResponse) => {
+        setLoading(false)
+        if (data.status === 'OK') {
+          toast.success(`${data.accountsSynced} compte${data.accountsSynced !== 1 ? 's' : ''} synchronisé${data.accountsSynced !== 1 ? 's' : ''}`)
+        } else if (data.status === 'NEEDS_MAPPING') {
+          handleApiSyncPreview()
+        } else if (data.status === 'TOTP_REQUIRED') {
+          setTotpRequired(true)
+        }
+      },
+      onError: (err: any) => {
+        setLoading(false)
+        setError(err.response?.data?.detail || t('common.retry'))
+      },
+    })
+  }
+
+  // ----- Preview with TOTP (fallback when TOTP required) -----
 
   function handleSync() {
     setLoading(true)
@@ -132,7 +159,6 @@ export function FinaryTab() {
         setTotpCode('')
 
         if (data.autoMapped && data.suggestedMappings) {
-          // Auto-sync: skip mapping, execute directly
           executeWithMappings(data.fileToken, data.suggestedMappings)
         } else {
           setStep(2)
@@ -143,7 +169,7 @@ export function FinaryTab() {
         if (err.response?.status === 403) {
           setTotpRequired(true)
         } else {
-          setError(err instanceof Error ? err.message : t('common.retry'))
+          setError(err.response?.data?.detail || t('common.retry'))
         }
       },
     })
@@ -166,7 +192,7 @@ export function FinaryTab() {
         if (err.response?.status === 403) {
           setTotpRequired(true)
         } else {
-          setError(err instanceof Error ? err.message : t('common.retry'))
+          setError(err.response?.data?.detail || t('common.retry'))
         }
       },
     })
@@ -412,7 +438,7 @@ export function FinaryTab() {
             /* Connected: Sync + TOTP */
             <div className="space-y-4">
               <div className="flex gap-3">
-                <Button onClick={handleSync} disabled={loading} className="flex-1">
+                <Button onClick={handleAutoSync} disabled={loading} className="flex-1">
                   {loading ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />

@@ -10,6 +10,9 @@ import type {
   FinaryAccountMapping,
   FinaryImportRequest,
   FinaryImportResultResponse,
+  FinaryAutoSyncResponse,
+  BoursoSessionStatus,
+  BoursoAuthInitResponse,
 } from '@/types/api'
 
 // --- Bank Sync (Enable Banking) ---
@@ -124,6 +127,29 @@ export const cryptoWalletApi = {
     api.delete(`/crypto/wallet/${id}`),
 }
 
+// --- BoursoBank ---
+
+export const boursoApi = {
+  initiateAuth: (customerId: string, password: string) =>
+    api
+      .post<BoursoAuthInitResponse>('/bourso/auth/initiate', { customerId, password })
+      .then(r => r.data),
+
+  completeAuth: (processId: string, code: string) =>
+    api
+      .post<BoursoSessionStatus>('/bourso/auth/complete', { processId, code })
+      .then(r => r.data),
+
+  sync: () =>
+    api.post<Account[]>('/bourso/sync').then(r => r.data),
+
+  getStatus: () =>
+    api.get<BoursoSessionStatus>('/bourso/status').then(r => r.data),
+
+  clearSession: () =>
+    api.delete('/bourso/session'),
+}
+
 // --- Finary ---
 
 export const finaryApi = {
@@ -155,5 +181,10 @@ export const finaryApi = {
   executeApiSync: (syncToken: string, mappings: FinaryAccountMapping[]) =>
     api
       .post<FinaryImportResultResponse>('/finary/api-sync/execute', { syncToken, mappings })
+      .then(r => r.data),
+
+  autoSync: (totp?: string) =>
+    api
+      .post<FinaryAutoSyncResponse>(`/finary/api-sync/auto${totp ? `?totp=${totp}` : ''}`)
       .then(r => r.data),
 }
