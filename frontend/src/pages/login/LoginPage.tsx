@@ -28,8 +28,17 @@ export function LoginPage() {
     try {
       await loginMutation.mutateAsync({ username, password })
       navigate(redirect, { replace: true })
-    } catch {
-      setError(t('auth.error'))
+    } catch (err: any) {
+      const status = err?.response?.status
+      if (!err?.response) {
+        setError(`Impossible de contacter le serveur (${err?.message ?? 'Network Error'})`)
+      } else if (status === 429) {
+        setError('Trop de tentatives, réessayez dans quelques minutes')
+      } else if (status === 401) {
+        setError(t('auth.error'))
+      } else {
+        setError(`Erreur ${status} — ${err?.response?.data?.detail ?? err?.message}`)
+      }
     }
   }
 
