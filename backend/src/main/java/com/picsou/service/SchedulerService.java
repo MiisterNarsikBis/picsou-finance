@@ -104,6 +104,8 @@ public class SchedulerService {
                     log.info("Finary auto-sync for member {} found new accounts, manual mapping required", memberId);
                 } else if ("OK".equals(finaryResult.status())) {
                     log.info("Finary auto-sync completed for member {}: {} accounts synced", memberId, finaryResult.accountsSynced());
+                } else if ("TOTP_REQUIRED".equals(finaryResult.status())) {
+                    log.warn("Finary auto-sync for member {} requires TOTP — user must re-authenticate", memberId);
                 }
             } catch (Exception ex) {
                 log.error("Daily Finary auto-sync failed for member {}", memberId, ex);

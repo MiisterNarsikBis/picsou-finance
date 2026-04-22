@@ -382,7 +382,6 @@ public class FinaryApiSyncService {
      * Auto-sync: preview + execute in one step if all accounts are already mapped.
      * Returns NEEDS_MAPPING if new accounts are discovered (user must go through mapping UI).
      */
-    @Transactional
     public FinaryAutoSyncResponse autoSync(Long memberId) {
         Optional<FinarySession> sessionOpt = finarySessionRepository.findByMemberId(memberId);
         if (sessionOpt.isEmpty() || !"CONNECTED".equals(sessionOpt.get().getStatus())) {
@@ -401,6 +400,9 @@ public class FinaryApiSyncService {
             session.setStatus("TOTP_REQUIRED");
             finarySessionRepository.save(session);
             return new FinaryAutoSyncResponse("TOTP_REQUIRED", 0, 0);
+        } catch (SyncException e) {
+            log.error("Finary auto-sync failed for member {}: {}", memberId, e.getMessage(), e);
+            throw e;
         } catch (RuntimeException e) {
             log.error("Finary auto-sync failed for member {}: {}", memberId, e.getMessage(), e);
             throw new SyncException("Finary auto-sync failed: " + e.getMessage(), e);

@@ -285,7 +285,7 @@ public class BoursoSyncService {
             LocalDate cutoff = LocalDate.now().minusDays(90);
             List<Transaction> existingTx = transactionRepository.findByAccountIdOrderByDateDesc(account.getId());
             List<Transaction> toKeep     = existingTx.stream()
-                .filter(t -> t.getDate().isBefore(cutoff))
+                .filter(t -> t.getDate().isBefore(cutoff) && !t.isManual())
                 .toList();
 
             transactionRepository.deleteByAccountIdAndIsManualFalse(account.getId());
