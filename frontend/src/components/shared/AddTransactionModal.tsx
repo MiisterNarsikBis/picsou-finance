@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import type { AccountType, TransactionRequest } from '@/types/api'
-import { useAccountHoldings } from '@/features/accounts/hooks'
+import { accountsApi } from '@/features/accounts/api'
+import { QUERY_STALE_TIMES } from '@/lib/constants'
 
 const INVESTMENT_TYPES: AccountType[] = ['PEA', 'COMPTE_TITRES', 'CRYPTO']
 
@@ -20,13 +21,19 @@ interface AddTransactionModalProps {
 }
 
 export function AddTransactionModal({ open, onOpenChange, accountId, accountType, onSubmit, isLoading }: AddTransactionModalProps) {
-  const { t } = useTranslation()
   const isInvestment = INVESTMENT_TYPES.includes(accountType)
-  const { data: holdings } = useAccountHoldings(isInvestment ? accountId : 0)
+
+  const { data: holdings } = useQuery({
+    queryKey: ['accounts', accountId, 'holdings'],
+    queryFn: () => accountsApi.holdings(accountId),
+    staleTime: QUERY_STALE_TIMES.accountDetail,
+    enabled: isInvestment && !!accountId,
+  })
 
   // Shared state
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [description, setDescription] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   // Cash fields
   const [txDirection, setTxDirection] = useState<'deposit' | 'withdrawal'>('deposit')
@@ -46,30 +53,34 @@ export function AddTransactionModal({ open, onOpenChange, accountId, accountType
     if (match?.name) setName(match.name)
   }, [ticker, holdings])
 
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!open) {
+      setDate(new Date().toISOString().split('T')[0])
+      setDescription('')
+      setError(null)
+      setTxDirection('deposit')
+      setCashAmount('')
+      setInvestType('BUY')
+      setTicker('')
+      setName('')
+      setQuantity('')
+      setPricePerUnit('')
+    }
+  }, [open])
+
   const total = quantity && pricePerUnit
     ? (parseFloat(quantity) * parseFloat(pricePerUnit)).toFixed(2)
     : '—'
 
-  function reset() {
-    setDate(new Date().toISOString().split('T')[0])
-    setDescription('')
-    setTxDirection('deposit')
-    setCashAmount('')
-    setInvestType('BUY')
-    setTicker('')
-    setName('')
-    setQuantity('')
-    setPricePerUnit('')
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
     let data: TransactionRequest
 
     if (isInvestment) {
       const qty = parseFloat(quantity)
       const price = parseFloat(pricePerUnit)
-      // amount: positive for SELL (receiving), negative for BUY (spending)
       const amount = investType === 'BUY' ? -(qty * price) : (qty * price)
       data = {
         date,
@@ -91,12 +102,13 @@ export function AddTransactionModal({ open, onOpenChange, accountId, accountType
       }
     }
 
-    await onSubmit(data)
-    reset()
-    onOpenChange(false)
+    try {
+      await onSubmit(data)
+      onOpenChange(false)
+    } catch {
+      setError('Une erreur est survenue. Veuillez réessayer.')
+    }
   }
-
-  void t
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -176,6 +188,8 @@ export function AddTransactionModal({ open, onOpenChange, accountId, accountType
               </div>
             </>
           )}
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
