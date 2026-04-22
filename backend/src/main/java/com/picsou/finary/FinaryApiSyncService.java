@@ -97,6 +97,15 @@ public class FinaryApiSyncService {
         return new FinaryConnectionStatusResponse(true, s.getId(), s.getStatus(), s.getLastSyncedAt(), maskedEmail);
     }
 
+    public FinaryCheckTotpResponse checkTotp(Long memberId) {
+        FinarySession session = finarySessionRepository.findByMemberId(memberId)
+            .orElseThrow(() -> new ResourceNotFoundException("No Finary session for member: " + memberId));
+        String email = encryption.decrypt(session.getEmail());
+        String password = encryption.decrypt(session.getPassword());
+        String signInId = finaryApiClient.checkTotpRequired(email, password);
+        return new FinaryCheckTotpResponse(signInId != null);
+    }
+
     @Transactional
     public void deleteSession(Long memberId) {
         finarySessionRepository.findByMemberId(memberId)
