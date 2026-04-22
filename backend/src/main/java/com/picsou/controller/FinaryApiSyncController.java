@@ -1,6 +1,7 @@
 package com.picsou.controller;
 
 import com.picsou.dto.FinaryApiSyncExecuteRequest;
+import com.picsou.dto.FinaryCheckTotpResponse;
 import com.picsou.dto.FinaryAutoSyncResponse;
 import com.picsou.dto.FinaryConnectionStatusResponse;
 import com.picsou.dto.FinaryImportResultResponse;
@@ -37,6 +38,15 @@ public class FinaryApiSyncController {
     @PostMapping("/login")
     public void login(@RequestBody FinaryLoginRequest request) {
         finaryApiSyncService.login(request.email(), request.password(), userContext.currentMemberId());
+    }
+
+    /**
+     * Check whether stored Finary credentials require TOTP to authenticate.
+     * Must be called after /login has stored credentials.
+     */
+    @PostMapping("/check-totp")
+    public FinaryCheckTotpResponse checkTotp() {
+        return finaryApiSyncService.checkTotp(userContext.currentMemberId());
     }
 
     /**
