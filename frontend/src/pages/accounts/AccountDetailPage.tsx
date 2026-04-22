@@ -3,13 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   useAccount, useAccountHistory, useHoldingsWithLivePrices,
-  useAccountTransactions, useAddSnapshot
+  useAccountTransactions, useAddSnapshot, useAddTransaction, useDeleteTransaction
 } from '@/features/accounts/hooks'
 import { useHistory } from '@/features/history/hooks'
 import { BalanceHistoryChart } from '@/components/shared/BalanceHistoryChart'
 import { NetWorthChart } from '@/components/shared/NetWorthChart'
 import { HoldingsTable } from '@/components/shared/HoldingsTable'
 import { TransactionsList } from '@/components/shared/TransactionsList'
+import { AddTransactionModal } from '@/components/shared/AddTransactionModal'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { AccountTypeBadge } from '@/components/shared/AccountTypeBadge'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -64,9 +65,12 @@ export function AccountDetailPage() {
   const { data: holdings } = useHoldingsWithLivePrices(accountId)
   const { data: transactions } = useAccountTransactions(accountId)
   const addSnapshot = useAddSnapshot()
+  const addTxMutation = useAddTransaction(accountId)
+  const deleteTxMutation = useDeleteTransaction(accountId)
   const { data: pnlData } = useHistory(accountId ? [accountId] : [], 12)
 
   const [showHistory, setShowHistory] = useState(false)
+  const [showAddTx, setShowAddTx] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
   const [modified, setModified] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -246,7 +250,18 @@ export function AccountDetailPage() {
 
       {/* Transactions */}
       {transactions ? (
-        <TransactionsList transactions={transactions} />
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold">{t('accounts.transactions')}</h3>
+            <Button size="sm" variant="outline" onClick={() => setShowAddTx(true)}>
+              + Ajouter
+            </Button>
+          </div>
+          <TransactionsList
+            transactions={transactions}
+            onDelete={(txId) => deleteTxMutation.mutate(txId)}
+          />
+        </>
       ) : (
         <Card>
           <CardContent className="pt-6">
@@ -275,6 +290,17 @@ export function AccountDetailPage() {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {/* Add Transaction modal */}
+      {account && (
+        <AddTransactionModal
+          open={showAddTx}
+          onOpenChange={setShowAddTx}
+          accountType={account.type}
+          onSubmit={async (data) => { await addTxMutation.mutateAsync(data) }}
+          isLoading={addTxMutation.isPending}
+        />
       )}
 
       {/* Monthly history dialog */}

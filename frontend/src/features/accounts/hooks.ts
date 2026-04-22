@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { accountsApi } from './api'
-import type { AccountRequest, Account, DebtRequest, HoldingResponse, RealEstateMetadataRequest } from '@/types/api'
+import type { AccountRequest, Account, DebtRequest, HoldingResponse, RealEstateMetadataRequest, TransactionRequest } from '@/types/api'
 import { QUERY_STALE_TIMES } from '@/lib/constants'
 
 export interface HoldingWithAccount extends HoldingResponse {
@@ -72,7 +72,11 @@ export function usePortfolio() {
         if (!l.ticker || l.ticker === 'EUR') return l
         const livePrice = livePrices[l.ticker]
         if (livePrice == null) return l // keep backend priceUpdatedAt
-        return { ...l, priceUpdatedAt: now }
+        const valueEur = l.quantity * livePrice
+        const pnlEur = l.pnlEur != null && l.valueEur > 0
+          ? l.pnlEur + (valueEur - l.valueEur)
+          : null
+        return { ...l, valueEur, pnlEur, priceUpdatedAt: now }
       })
 
       // Cash accounts — aggregate into a single "Euros" line (exclude LOAN accounts)
@@ -248,5 +252,53 @@ export function useUpdateDebtMetadata() {
       queryClient.invalidateQueries({ queryKey: ['accounts', variables.id] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
+  })
+}
+
+export function useAddTransaction(accountId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: TransactionRequest) => accountsApi.addTransaction(accountId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId, 'transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId, 'history'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+export function useDeleteTransaction(accountId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (txId: number) => accountsApi.deleteTransaction(accountId, txId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId, 'transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId, 'history'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts', accountId] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Price history
+// ---------------------------------------------------------------------------
+
+export type PricePoint = { date: string; priceEur: number }
+
+export function usePriceHistory(ticker: string | null, months: number, range: string) {
+  const is24H = range === '24H'
+  return useQuery({
+    queryKey: ['price-history', ticker, is24H ? 'intraday' : months],
+    queryFn: async (): Promise<PricePoint[]> => {
+      if (is24H) {
+        const data = await accountsApi.priceIntraday(ticker!)
+        return data.map(p => ({ date: p.timestamp, priceEur: p.priceEur }))
+      }
+      return accountsApi.priceHistory(ticker!, months)
+    },
+    enabled: !!ticker,
+    staleTime: 2 * 60 * 1000,
   })
 }

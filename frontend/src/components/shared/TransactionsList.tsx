@@ -3,15 +3,18 @@ import { useTranslation } from 'react-i18next'
 import type { Transaction } from '@/types/api'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TransactionsListProps {
   transactions: Transaction[]
+  onDelete?: (txId: number) => void
 }
 
-export function TransactionsList({ transactions }: TransactionsListProps) {
+export function TransactionsList({ transactions, onDelete }: TransactionsListProps) {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
 
@@ -61,17 +64,34 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
                     rowIdx % 2 === 0 ? 'bg-muted/20' : 'bg-transparent',
                   )}
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{tr.description}</p>
-                  </div>
-                  <CurrencyDisplay
-                    value={tr.amount}
-                    currency={tr.nativeCurrency}
-                    className={cn(
-                      'text-base font-semibold tabular-nums ml-4',
-                      tr.amount >= 0 ? 'text-emerald-500' : 'text-foreground',
+                    {tr.isManual && (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground shrink-0">
+                        Manuel
+                      </span>
                     )}
-                  />
+                  </div>
+                  <div className="flex items-center gap-2 ml-4">
+                    <CurrencyDisplay
+                      value={tr.amount}
+                      currency={tr.nativeCurrency}
+                      className={cn(
+                        'text-base font-semibold tabular-nums',
+                        tr.amount >= 0 ? 'text-emerald-500' : 'text-foreground',
+                      )}
+                    />
+                    {onDelete && tr.isManual && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => onDelete(tr.id)}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

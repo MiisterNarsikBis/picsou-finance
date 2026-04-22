@@ -118,6 +118,8 @@ export interface DashboardData {
     color: string
     balanceEur: number
     percentage: number
+    accountType: string
+    hasHoldings: boolean
   }[]
   liabilities: {
     accountId: number
@@ -125,6 +127,8 @@ export interface DashboardData {
     color: string
     balanceEur: number
     percentage: number
+    accountType: string
+    hasHoldings: boolean
   }[]
   goalSummaries: GoalProgress[]
 }
@@ -172,6 +176,18 @@ export interface WalletStatus {
 export interface TrSessionStatus {
   isActive: boolean
   expiresAt: string | null
+}
+
+export interface BoursoSessionStatus {
+  isActive: boolean
+  expiresAt: string | null
+}
+
+export interface BoursoAuthInitResponse {
+  processId: string | null
+  mfaRequired: boolean
+  mfaType: string | null
+  contact: string | null
 }
 
 export interface FinaryAccountPreview {
@@ -247,4 +263,20 @@ export interface Transaction {
   type: string | null
   category: string | null
   nativeCurrency: string
+  isManual: boolean
+  txType: 'DEPOSIT' | 'WITHDRAWAL' | 'BUY' | 'SELL' | 'DIVIDEND' | 'FEE' | null
+  ticker: string | null
+  quantity: number | null
+  pricePerUnit: number | null
+}
+
+export interface TransactionRequest {
+  date: string          // ISO date "YYYY-MM-DD"
+  description: string
+  amount: number        // signed: positive=deposit, negative=withdrawal
+  txType: 'DEPOSIT' | 'WITHDRAWAL' | 'BUY' | 'SELL' | 'DIVIDEND' | 'FEE' | null
+  ticker?: string
+  quantity?: number
+  pricePerUnit?: number
+  currency?: string
 }
