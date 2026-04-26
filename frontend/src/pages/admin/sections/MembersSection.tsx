@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Users, Link as LinkIcon, KeyRound, Trash2, Copy, Check } from 'lucide-react'
+import { Users, Link as LinkIcon, KeyRound, Trash2, Copy, Check, ShieldOff, ShieldCheck } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -17,6 +17,7 @@ import {
   useGenerateActivationLink,
   useResetMemberPassword,
 } from '@/features/family/hooks'
+import { useAdminForceDisableMfa } from '@/features/mfa/hooks'
 
 type GeneratedLink = { memberId: number; url: string } | null
 
@@ -27,10 +28,12 @@ export function MembersSection() {
   const deleteMember = useDeleteMember()
   const generateActivation = useGenerateActivationLink()
   const resetPassword = useResetMemberPassword()
+  const forceDisableMfa = useAdminForceDisableMfa()
 
   const [link, setLink] = useState<GeneratedLink>(null)
   const [copied, setCopied] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [resetMfaId, setResetMfaId] = useState<number | null>(null)
 
   function showLink(memberId: number, path: string) {
     setLink({ memberId, url: `${window.location.origin}${path}` })
@@ -52,6 +55,13 @@ export function MembersSection() {
     if (deletingId == null) return
     deleteMember.mutate(deletingId, {
       onSuccess: () => setDeletingId(null),
+    })
+  }
+
+  function handleConfirmResetMfa() {
+    if (resetMfaId == null) return
+    forceDisableMfa.mutate(resetMfaId, {
+      onSuccess: () => setResetMfaId(null),
     })
   }
 
@@ -108,6 +118,15 @@ export function MembersSection() {
                         </span>
                         <span className="mx-2">·</span>
                         <span>{t(`admin.members.${status}`)}</span>
+                        {m.mfaEnabled && (
+                          <>
+                            <span className="mx-2">·</span>
+                            <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                              <ShieldCheck size={11} />
+                              {t('admin.members.mfaOn')}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -146,6 +165,19 @@ export function MembersSection() {
                       >
                         <KeyRound className="size-3.5" />
                         {t('admin.members.resetPassword')}
+                      </Button>
+                    )}
+
+                    {/* Reset 2FA — locked-out account recovery */}
+                    {m.mfaEnabled && !isSelf && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setResetMfaId(m.id)}
+                      >
+                        <ShieldOff className="size-3.5" />
+                        {t('admin.members.resetMfa')}
                       </Button>
                     )}
 
@@ -191,6 +223,16 @@ export function MembersSection() {
         description={t('admin.members.deleteConfirmDesc')}
         onConfirm={handleConfirmDelete}
         loading={deleteMember.isPending}
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={resetMfaId !== null}
+        onOpenChange={(o) => { if (!o) setResetMfaId(null) }}
+        title={t('admin.members.resetMfaConfirmTitle')}
+        description={t('admin.members.resetMfaConfirmDesc')}
+        onConfirm={handleConfirmResetMfa}
+        loading={forceDisableMfa.isPending}
         variant="destructive"
       />
     </Card>

@@ -8,6 +8,7 @@ export interface FamilyMemberItem {
   hasLogin: boolean
   activated: boolean
   loginName: string | null
+  mfaEnabled: boolean
 }
 
 export interface FamilyDashboard {

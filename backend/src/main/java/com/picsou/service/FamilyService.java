@@ -24,6 +24,7 @@ public class FamilyService {
 
     private final FamilyMemberRepository memberRepository;
     private final AppUserRepository userRepository;
+    private final UserMfaRepository userMfaRepository;
     private final SharingSettingsRepository sharingSettingsRepository;
     private final SharedResourceRepository sharedResourceRepository;
     private final PasswordEncoder passwordEncoder;
@@ -31,12 +32,14 @@ public class FamilyService {
     public FamilyService(
         FamilyMemberRepository memberRepository,
         AppUserRepository userRepository,
+        UserMfaRepository userMfaRepository,
         SharingSettingsRepository sharingSettingsRepository,
         SharedResourceRepository sharedResourceRepository,
         PasswordEncoder passwordEncoder
     ) {
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
+        this.userMfaRepository = userMfaRepository;
         this.sharingSettingsRepository = sharingSettingsRepository;
         this.sharedResourceRepository = sharedResourceRepository;
         this.passwordEncoder = passwordEncoder;
@@ -46,7 +49,10 @@ public class FamilyService {
         return memberRepository.findAllByOrderByCreatedAtAsc().stream()
             .map(m -> {
                 AppUser user = userRepository.findByMemberId(m.getId()).orElse(null);
-                return FamilyMemberResponse.from(m, user);
+                boolean mfaEnabled = user != null && userMfaRepository.findByUserId(user.getId())
+                    .map(UserMfa::isEnabled)
+                    .orElse(false);
+                return FamilyMemberResponse.from(m, user, mfaEnabled);
             })
             .toList();
     }
@@ -59,7 +65,7 @@ public class FamilyService {
             .managed(true)
             .build();
         member = memberRepository.save(member);
-        return FamilyMemberResponse.from(member, null);
+        return FamilyMemberResponse.from(member, null, false);
     }
 
     @Transactional
@@ -69,7 +75,10 @@ public class FamilyService {
         member.setDisplayName(displayName);
         member = memberRepository.save(member);
         AppUser user = userRepository.findByMemberId(id).orElse(null);
-        return FamilyMemberResponse.from(member, user);
+        boolean mfaEnabled = user != null && userMfaRepository.findByUserId(user.getId())
+            .map(UserMfa::isEnabled)
+            .orElse(false);
+        return FamilyMemberResponse.from(member, user, mfaEnabled);
     }
 
     @Transactional

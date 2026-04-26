@@ -10,9 +10,10 @@ public record FamilyMemberResponse(
     boolean managed,
     boolean hasLogin,
     boolean activated,
-    String loginName
+    String loginName,
+    boolean mfaEnabled
 ) {
-    public static FamilyMemberResponse from(FamilyMember member, AppUser user) {
+    public static FamilyMemberResponse from(FamilyMember member, AppUser user, boolean mfaEnabled) {
         return new FamilyMemberResponse(
             member.getId(),
             member.getDisplayName(),
@@ -20,7 +21,8 @@ public record FamilyMemberResponse(
             member.isManaged(),
             user != null,
             user != null && user.isActivated(),
-            user != null ? user.getUsername() : null
+            user != null ? user.getUsername() : null,
+            mfaEnabled
         );
     }
 }
