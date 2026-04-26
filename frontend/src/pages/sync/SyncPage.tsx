@@ -7,7 +7,7 @@ import { CryptoExchangeTab } from './CryptoExchangeTab'
 import { CryptoWalletTab } from './CryptoWalletTab'
 import { TradeRepublicTab } from './TradeRepublicTab'
 import { FinaryTab } from './FinaryTab'
-import { BoursoTab } from './BoursoTab'
+// BoursoTab hidden for 1.0.0 — sidecar integration not finished.
 
 export function SyncPage() {
   const { t } = useTranslation()
@@ -24,7 +24,6 @@ export function SyncPage() {
           <TabsTrigger value="wallets">{t('sync.wallets.title')}</TabsTrigger>
           <TabsTrigger value="tr">{t('sync.tr.title')}</TabsTrigger>
           <TabsTrigger value="finary">{t('sync.finary.title')}</TabsTrigger>
-          <TabsTrigger value="bourso">{t('sync.bourso.title')}</TabsTrigger>
         </TabsList>
         <TabsContent value="banks" className="mt-6">
           <BankSyncTab />
@@ -40,9 +39,6 @@ export function SyncPage() {
         </TabsContent>
         <TabsContent value="finary" className="mt-6">
           <FinaryTab />
-        </TabsContent>
-        <TabsContent value="bourso" className="mt-6">
-          <BoursoTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import type { ComponentType } from 'react'
 import {
   Landmark,
-  Boxes,
   LineChart,
   PiggyBank,
   Bitcoin,
@@ -24,7 +23,7 @@ const CATALOG: Array<{
   route: string
 }> = [
   { key: 'enablebanking', icon: Landmark, route: '/setup/integrations/enablebanking' },
-  { key: 'boursobank', icon: Boxes, route: '/setup/integrations/boursobank' },
+  // BoursoBank disabled for 1.0.0 — sidecar integration not finished.
   { key: 'traderepublic', icon: LineChart, route: '/setup/integrations/traderepublic' },
   { key: 'finary', icon: PiggyBank, route: '/setup/integrations/finary' },
   { key: 'crypto', icon: Bitcoin, route: '/setup/integrations/crypto' },

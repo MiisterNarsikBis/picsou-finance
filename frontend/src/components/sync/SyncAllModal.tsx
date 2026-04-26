@@ -111,7 +111,8 @@ export function SyncAllModal({ open, onOpenChange }: SyncAllModalProps) {
 
   // Detect if user has a TR / BoursoBank account
   const hasTrAccount     = accounts?.some(a => a.provider === 'Trade Republic') ?? false
-  const hasBoursoAccount = accounts?.some(a => a.provider === 'BoursoBank') ?? false
+  // BoursoBank disabled for 1.0.0 — sidecar integration not finished.
+  const hasBoursoAccount = false
 
   // Mutations
   const retryBankMutation    = useRetryBankSync()

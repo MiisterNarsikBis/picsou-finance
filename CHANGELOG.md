@@ -55,8 +55,10 @@ loan amortization, GDPR data export, and dozens of refinements.
   (`627533a`).
 
 #### Integrations
-- **BoursoBank.** Python sidecar (Selenium-based), `BoursoAdapter`,
-  `BoursoController`, sessions table, V23 migration (`b953e55`).
+- **BoursoBank** *(disabled in 1.0.0)*. Python sidecar (Selenium-based),
+  `BoursoAdapter`, `BoursoController`, sessions table, V23 migration shipped
+  but the sidecar and all UI entry points are gated off until the integration
+  is finished (`b953e55`).
 - **Trade Republic compact portfolio.** `compactPortfolio` with `secAccNo` for
   portfolio sync; deduplication when multiple ISINs map to the same ticker
   (`91972b6`, `1b91abf`).
