@@ -61,6 +61,7 @@
 | Frontend error display (`extractErrorMessage`) | 2026-04-25 | [frontend-error-display.md](./features/frontend-error-display.md) |
 | Loan accounts (LOAN type, amortization view) | 2026-04-26 | [loans.md](./features/loans.md) |
 | 2FA (TOTP) and Remember Me | 2026-04-26 | [mfa-and-remember-me.md](./features/mfa-and-remember-me.md) |
+| GDPR data export (JSON + CSV) | 2026-04-26 | [data-export.md](./features/data-export.md) |
 
 ## Conventions
 
