@@ -1,6 +1,6 @@
 # Project: Picsou
 
-Self-hosted personal finance dashboard -- bank sync, crypto, goals, net worth tracking.
+Self-hosted personal-finance dashboard for an individual or a small family — bank sync, crypto, goals, net-worth tracking, multi-member sharing, 2FA.
 
 ## Stack
 
@@ -15,10 +15,10 @@ Self-hosted personal finance dashboard -- bank sync, crypto, goals, net worth tr
 ```bash
 # Backend
 cd backend
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # Run locally (needs PostgreSQL on :5432)
-./mvnw test                                              # Run all tests
-./mvnw test -Dtest=GoalServiceTest                       # Run a single test class
-./mvnw package -DskipTests                               # Build JAR
+mvn spring-boot:run -Dspring-boot.run.profiles=dev   # Run locally (needs PostgreSQL on :5432)
+mvn test                                              # Run all tests
+mvn test -Dtest=GoalServiceTest                       # Run a single test class
+mvn package -DskipTests                               # Build JAR
 
 # Frontend
 cd frontend
@@ -26,7 +26,9 @@ bun run dev          # Dev server on :5173 -- proxies /api/* to http://localhost
 bun run build        # tsc + vite build (fails on type errors)
 bun run preview      # Serve the production build locally
 bun run typecheck    # TypeScript type checking only
-npx vitest run       # Run all unit tests
+bun run lint         # ESLint
+bunx vitest run      # Run unit tests
+bun run test:e2e     # Playwright E2E tests
 ```
 
 ## Code conventions

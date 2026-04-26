@@ -15,7 +15,7 @@
 | Date | Decision | Status |
 |------|----------|--------|
 | 2026-01-01 | [Ports and adapters architecture](./decisions/2026-01-01-ports-and-adapters.md) | Active |
-| 2026-01-01 | [Single user with JWT in HttpOnly cookies](./decisions/2026-01-01-single-user-jwt-cookies.md) | Active |
+| 2026-01-01 | [Single user with JWT in HttpOnly cookies](./decisions/2026-01-01-single-user-jwt-cookies.md) | ⚠️ Superseded |
 | 2026-01-01 | [Flyway owns the schema](./decisions/2026-01-01-flyway-schema-ownership.md) | Active |
 | 2026-03-01 | [Dual bank provider](./decisions/2026-03-01-dual-bank-providers.md) | Active |
 | 2026-03-01 | [AES-256-GCM encryption for crypto secrets](./decisions/2026-03-01-aes-gcm-crypto-secrets.md) | Active |
@@ -48,7 +48,7 @@
 | Live prices (holdings) | 2026-04-13 | [live-prices-holdings.md](./features/live-prices-holdings.md) |
 | Finary import + auto-sync | 2026-04-21 | [finary-import.md](./features/finary-import.md) |
 | Manual transactions + holdings derivation | 2026-04-21 | [manual-transactions.md](./features/manual-transactions.md) |
-| BoursoBank sync | 2026-04-21 | [bourso-bank.md](./features/bourso-bank.md) |
+| BoursoBank sync ⏸ disabled in 1.0.0 | 2026-04-26 | [bourso-bank.md](./features/bourso-bank.md) |
 | Accounts overview (PnL chart + summary card + filters) | 2026-04-13 | [accounts-overview.md](./features/accounts-overview.md) |
 | Add Account modal (unified sync + manual) | 2026-04-25 | [add-account-modal.md](./features/add-account-modal.md) |
 | Docker deployment | 2026-04-25 | [docker-deployment.md](./features/docker-deployment.md) |

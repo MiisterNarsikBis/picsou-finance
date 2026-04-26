@@ -1,7 +1,19 @@
 # ADR: Single-User JWT with HttpOnly Cookies
 
 > Date: 2026-01-01
-> Status: ✅ Active
+> Status: ⚠️ Superseded (2026-04-26)
+> Superseded by:
+> - [2026-04-26 — TOTP 2FA and persistent (Remember-Me) sessions](./2026-04-26-totp-2fa-and-persistent-sessions.md)
+> - [`docs/features/multi-account-family.md`](../features/multi-account-family.md)
+> - [`docs/features/security-cors-cookies.md`](../features/security-cors-cookies.md)
+
+> **What changed.** The original "single hardcoded user" model has been replaced by
+> multi-member families (each member is a real `AppUser` linked to a `FamilyMember`).
+> Cookies are now `SameSite=Lax` (not `Strict`) for Safari iOS compatibility.
+> Stateless JWT invalidation is now possible via the `tv` (token-version) claim,
+> bumped on password change. Optional TOTP 2FA and rotating "Remember Me" tokens
+> were added. Refer to the superseding ADR/feature docs for the current behavior.
+> The reasoning below is preserved as historical context.
 
 ## Context
 

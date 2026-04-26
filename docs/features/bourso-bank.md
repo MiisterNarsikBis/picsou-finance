@@ -1,6 +1,14 @@
 # Feature: BoursoBank Sync
 
-> Last updated: 2026-04-21
+> Last updated: 2026-04-26
+> Status: ⏸ **Disabled in 1.0.0** — sidecar integration is not finished.
+
+> The backend code (`BoursoAdapter`, `BoursoController`, `BoursoSession` entity,
+> V23 migration) and the Python sidecar source remain in place, but the
+> `bourso-auth` container is commented out in `docker-compose.yml`, the setup
+> wizard catalog hides the integration, the sync page does not show the tab,
+> and the admin integrations toggle is hidden. Re-enable only after the
+> integration has been completed and reviewed (see `SECURITY.md`).
 
 ## Context
 

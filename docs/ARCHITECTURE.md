@@ -5,38 +5,63 @@
 
 ## Overview
 
-Picsou is a self-hosted, single-user personal finance dashboard. It aggregates accounts from banks (PSD2/scraping), brokers (Trade Republic), crypto exchanges (Binance), and on-chain wallets (BTC/ETH/SOL). It tracks balances over time, computes net worth, and helps users set and track savings goals.
+Picsou is a self-hosted personal-finance dashboard for an individual or a small family. It aggregates accounts from banks (PSD2/scraping), brokers (Trade Republic), crypto exchanges (Binance), and on-chain wallets (BTC/ETH/SOL); tracks balances over time, computes net worth, and helps members set savings goals, manage debts, and export their data. Each authenticated `AppUser` is linked to a `FamilyMember`, and every financial row is scoped by `member_id` with optional sharing.
 
 ## Backend modules
 
 ```
 com.picsou/
-├── model/          JPA entities: Account, Goal, Transaction, BalanceSnapshot,
-│                   AccountHolding, Requisition, TradeRepublicSession,
-│                   CryptoExchangeSession, WalletAddress, GoalMonthOverride, AppUser
-├── repository/     Spring Data JPA interfaces (11 repos)
-├── service/        Business logic (AccountService, GoalService, DashboardService,
-│                   SyncService, TradeRepublicSyncService, CryptoExchangeSyncService,
-│                   WalletSyncService, PriceService, SchedulerService,
-│                   FinaryImportService, FinaryApiSyncService)
-├── controller/     REST controllers under /api/ (11 controllers)
-├── dto/            Request/response records (18 DTOs)
-├── port/           5 port interfaces (BankConnectorPort, PriceProviderPort,
-│                   TradeRepublicPort, CryptoExchangePort, WalletPort)
+├── model/          JPA entities — financial: Account, AccountHolding, Transaction,
+│                   BalanceSnapshot, Goal, GoalManualContribution, GoalContributor,
+│                   Debt, RealEstateMetadata, WalletAddress;
+│                   integrations: Requisition, TradeRepublicSession, CryptoExchangeSession,
+│                   FinarySession, BoursoSession, PriceSnapshot;
+│                   identity & sharing: AppUser, FamilyMember, UserRole, SharingSettings,
+│                   SharingLevel, SharedResource, UserMfa, UserMfaRecoveryCode,
+│                   PersistentSession;
+│                   setup: AppSetting, SetupState, SetupAudit
+├── repository/     Spring Data JPA interfaces (one per entity, ~25 repos)
+├── service/        Business logic — financial: AccountService, GoalService,
+│                   DashboardService, HistoryService, ManualTransactionService,
+│                   HoldingComputeService, LoanAmortizationService, PriceService,
+│                   SchedulerService;
+│                   integrations: SyncService, TradeRepublicSyncService,
+│                   CryptoExchangeSyncService, WalletSyncService, BoursoSyncService,
+│                   FinaryImportService, FinaryApiSyncService;
+│                   identity & family: UserContext, FamilyService, FamilyViewService,
+│                   MfaService, PersistentSessionService, ReAuthService;
+│                   setup: SetupService, SetupAuditService, IntegrationsService,
+│                   IntegrationsHealthService, CryptoKeyGeneratorService,
+│                   EnableBankingKeyPairService
+├── controller/     REST controllers under /api/ — auth, mfa, sessions, family,
+│                   accounts, transactions, holdings, goals, debts, dashboard, history,
+│                   sync, tr, bourso, crypto-exchange, wallet, finary-import,
+│                   finary-api-sync, setup, admin, admin-mfa, me-export, price
+├── dto/            Request/response records (records are the convention)
+├── port/           Port interfaces (BankConnectorPort, PriceProviderPort,
+│                   TradeRepublicPort, CryptoExchangePort, WalletPort, BoursoPort)
 ├── adapter/        Port implementations + util/BitcoinKeyUtils
 │   ├── EnableBankingBankConnector, PowensBankConnector (bank sync)
+│   ├── BoursoAdapter (BoursoBank — disabled in 1.0.0)
 │   ├── CoinGeckoPriceProvider, YahooFinancePriceProvider (prices)
+│   ├── OpenFigiIsinConverter (ISIN → Yahoo ticker)
 │   ├── TradeRepublicAdapter (broker)
 │   ├── BinanceAdapter (crypto exchange)
 │   ├── BitcoinWalletAdapter, EthereumWalletAdapter, SolanaWalletAdapter (on-chain)
 │   └── util/BitcoinKeyUtils (BIP32 key derivation, Base58Check, Bech32)
-├── finary/         Finary import subsystem
-│   ├── client/FinaryApiClient.java
-│   ├── dto/ (13 DTOs for Finary API)
-│   └── SyncSessionData
-├── config/         SecurityConfig, JwtUtil, JwtAuthenticationFilter, DataSeeder,
-│                   RateLimitConfig, AppProperties, FinaryProperties, CryptoEncryption
-└── exception/      GlobalExceptionHandler, ResourceNotFoundException, SyncException
+├── finary/         Finary import + API-sync subsystem (client, DTOs, SyncSessionData,
+│                   FinaryPersistenceHelper, FinaryApiSyncService)
+├── export/         GDPR data export — DataExportService orchestrator + per-entity
+│                   exporters (Profile, Accounts, Holdings, Transactions, Goals, Debts,
+│                   Wallets, SharedResources, BankConnections, BalanceSnapshots) + CsvWriter
+├── config/         SecurityConfig, JwtUtil, JwtAuthenticationFilter,
+│                   PersistentTokenAuthFilter, AuthCookieWriter, SecureCookieProvider,
+│                   DynamicCorsConfigurationSource, LoggingCorsProcessor, SetupFilter,
+│                   DataSeeder, RateLimitConfig, FinaryProperties, CryptoEncryption,
+│                   TotpConfig, EnableBankingConfigProvider, PriceBackfillRunner,
+│                   StartupSyncService
+└── exception/      GlobalExceptionHandler, ResourceNotFoundException, SyncException,
+                    MfaException, TotpRequiredException
 ```
 
 ## Frontend modules
@@ -116,15 +141,69 @@ Client → GoalController → GoalService → Goal + GoalMonthOverride repos
 
 Savings goals with deadlines, linked to accounts via M:N join table (`goal_account`). Monthly tracking with optional per-month overrides.
 
+### 8. First-launch setup wizard
+
+```
+Browser → SetupFilter → /setup → SetupController → SetupService → AppSetting / SetupAudit
+                                                  → CryptoKeyGeneratorService
+                                                  → EnableBankingKeyPairService
+                                                  → IntegrationsService
+```
+
+`SetupFilter` redirects every request to `/setup` until `SetupState.completed = true`. The wizard collects admin credentials, security settings (CORS, encryption key), and per-integration credentials. Each step is appended to `setup_audit` (actor, IP, timestamp). After completion, the filter becomes a no-op.
+
+### 9. Authentication & MFA
+
+```
+POST /api/auth/login → AuthController → (if 2FA) issue mfa_challenge JWT → 401 + cookie
+POST /api/mfa/verify → MfaController → MfaService.verifyTotp() → issue access + refresh
+                                    → optionally issue persistent_token (Remember Me)
+Every request → JwtAuthenticationFilter → check tv claim vs AppUser.tokenVersion
+              → PersistentTokenAuthFilter → re-issue access if persistent_token valid
+```
+
+Password change in `AuthController.changePassword` bumps `AppUser.tokenVersion`, revokes all `PersistentSession`s for the user, clears the persistent cookie, and re-issues fresh access/refresh cookies.
+
+### 10. Family sharing
+
+```
+Member viewing dashboard → DashboardService scopes by UserContext.currentMemberId()
+Family dashboard → FamilyViewController → FamilyViewService
+                → for each FamilyMember: read SharingSettings (NONE / ALL / MANUAL)
+                → if MANUAL, intersect with SharedResource(memberId, resourceType, resourceId)
+```
+
+Admins can use `/admin/impersonate/{memberId}` to view another member's data; `UserContext.getMemberIdOverride()` returns the override; audit trail in `setup_audit`.
+
+### 11. GDPR data export
+
+```
+POST /api/me/export/reauth → ReAuthService verifies password (+ TOTP if enabled)
+GET  /api/me/export        → DataExportService runs each EntityExporter
+                          → emits a single ZIP containing JSON + CSV per entity
+```
+
+Wrapped in a read-only Spring transaction; rate-limited via `RateLimitConfig`.
+
+### 12. Loan amortization
+
+```
+GET /api/accounts/{id}/loan-schedule → AccountController → LoanAmortizationService
+                                    → returns monthly schedule (principal/interest split)
+```
+
+Computed on the fly from `Debt` (principal, rate, term, fees) — no per-month rows persisted. See ADR `2026-04-26-loan-amortization-on-the-fly.md`.
+
 ## External dependencies
 
 | Service | Usage | Config |
 |---------|-------|--------|
 | PostgreSQL 16 | Persistence | `SPRING_DATASOURCE_URL` |
-| Flyway | Schema migrations | `db/migration/` (13 files) |
+| Flyway | Schema migrations | `db/migration/` (latest V29) |
 | Enable Banking | PSD2 bank sync (optional) | `ENABLEBANKING_*` |
 | Powens / Budget Insight | Scraping bank sync (optional, priority) | `POWENS_*` |
 | Trade Republic | Broker sync via Python microservice | `TR_AUTH_URL` |
+| BoursoBank | Bank sync via Python sidecar (**disabled in 1.0.0**) | `BOURSO_AUTH_URL` |
 | Binance | Crypto exchange balances | Via CryptoExchangePort |
 | CoinGecko | Crypto prices (free) | No config |
 | Yahoo Finance | Stock/ETF prices (free) | No config |
@@ -135,10 +214,19 @@ Savings goals with deadlines, linked to accounts via M:N join table (`goal_accou
 
 ## Key constraints
 
-- **Ports & adapters:** controllers/services never import adapters directly. All external integrations go through 5 port interfaces.
-- **Flyway owns schema:** never use `ddl-auto: create/update`. Every schema change is a new migration file.
-- **Single-user:** one `AppUser`, bcrypt auth, no multi-tenancy. JWT in HttpOnly SameSite=Strict cookies.
-- **AES-256-GCM encryption:** crypto exchange API secrets encrypted at rest. `CRYPTO_ENCRYPTION_KEY` must be backed up -- lost key means re-authenticating all exchanges.
-- **Scheduled tasks:** `SchedulerService` handles daily balance snapshots and price cache refresh.
+- **Ports & adapters:** controllers/services never import adapters directly. All external integrations go through port interfaces.
+- **Flyway owns schema:** never use `ddl-auto: create/update`. Every schema change is a new migration file (latest: V29).
+- **Multi-member families:** each authenticated user is an `AppUser` linked to a `FamilyMember`. All financial rows are scoped by `member_id`; cross-member visibility is gated by `SharingSettings` + `SharedResource`. Admin role can impersonate any member.
+- **Auth:** JWT (`access_token` + `refresh_token`) in HttpOnly `SameSite=Lax` cookies. Optional TOTP 2FA, rotating persistent sessions ("Remember Me"), stateless invalidation via `tokenVersion` claim on password change.
+- **First-launch setup wizard:** on a fresh install, `SetupFilter` redirects to a wizard that creates the admin, configures CORS, generates the encryption key, and seeds integration credentials. No env-var editing required.
+- **AES-256-GCM encryption:** crypto-exchange API secrets, bank session tokens, and Finary credentials encrypted at rest. `CRYPTO_ENCRYPTION_KEY` must be backed up — lost key means re-authenticating all integrations.
+- **Scheduled tasks:** `SchedulerService` handles daily balance snapshots, price cache refresh, and per-member auto-sync.
 - **Demo mode:** frontend-only, mock interceptor short-circuits API calls, no backend needed.
-- **Secrets from environment variables:** never hardcoded. Required at startup: `JWT_SECRET`, `APP_USERNAME`, `APP_PASSWORD_HASH`.
+- **Secrets from environment variables or wizard store:** never hardcoded. Required at startup: `JWT_SECRET`, `CRYPTO_ENCRYPTION_KEY`. `APP_USERNAME` / `APP_PASSWORD_HASH` are optional — the wizard creates the admin if they're absent.
+
+## Disabled / experimental integrations
+
+- **BoursoBank** — code (adapter, controller, V23 migration) and Python sidecar
+  ship in 1.0.0 but the sidecar is commented out in `docker-compose.yml` and all
+  UI entry points (setup wizard catalog, sync tab, admin toggle) are hidden.
+  Re-enable only after the integration is finished and reviewed.

@@ -5,10 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # Run locally (needs PostgreSQL on :5432)
-./mvnw test                                              # Run all tests
-./mvnw test -Dtest=GoalServiceTest                       # Run a single test class
-./mvnw package -DskipTests                               # Build JAR
+mvn spring-boot:run -Dspring-boot.run.profiles=dev   # Run locally (needs PostgreSQL on :5432)
+mvn test                                              # Run all tests
+mvn test -Dtest=GoalServiceTest                       # Run a single test class
+mvn package -DskipTests                               # Build JAR
 ```
 
 Tests use H2 in-memory — no external database needed.
@@ -32,7 +32,9 @@ com.picsou/
 
 **Ports & adapters:** External integrations hide behind `BankConnectorPort` and `PriceProviderPort`. To swap a provider, implement the port and swap the `@Primary` bean — controllers/services never import adapters directly.
 
-**Auth flow:** `JwtAuthenticationFilter` reads the `access_token` HttpOnly cookie and sets the `SecurityContext`. `AuthController` issues and rotates tokens. CSRF is disabled — SameSite=Strict cookies provide equivalent protection.
+**Auth flow:** `JwtAuthenticationFilter` reads the `access_token` HttpOnly cookie, validates the `tv` (token-version) claim against `AppUser.tokenVersion`, and sets the `SecurityContext`. `AuthController` issues and rotates access/refresh tokens; `MfaController` issues `mfa_challenge` JWTs and verifies TOTP; `PersistentTokenAuthFilter` re-issues access tokens from rotating "Remember Me" tokens. CSRF is disabled — `SameSite=Lax` cookies + JSON-only API surface provide equivalent protection (`Lax` rather than `Strict` for Safari iOS compatibility).
+
+**Member-scoped authorization:** every controller resolves `UserContext.currentMemberId()` (or `currentMemberIdOverride()` for admin impersonation), and every service/repository scopes queries by `member_id`. Family-shared access goes through `SharingSettings` + `SharedResource`. Never query a repo without a member filter.
 
 **Rate limiting:** `RateLimitConfig` configures Bucket4j buckets; the actual enforcement is in the controllers via annotations. Login: 5 attempts/15 min. Sync endpoints are also throttled.
 
