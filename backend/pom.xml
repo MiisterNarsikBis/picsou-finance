@@ -103,6 +103,13 @@
             <version>${bucket4j.version}</version>
         </dependency>
 
+        <!-- TOTP (RFC 6238) for 2FA: secret generation, QR code, code verification -->
+        <dependency>
+            <groupId>dev.samstevens.totp</groupId>
+            <artifactId>totp</artifactId>
+            <version>1.7.1</version>
+        </dependency>
+
         <!-- HTTP client for Enable Banking / price APIs -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
