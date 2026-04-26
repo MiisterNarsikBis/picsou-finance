@@ -7,6 +7,7 @@ import com.picsou.model.AppUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -42,6 +43,7 @@ public class DataExportService {
         this.exporters = exporters;
     }
 
+    @Transactional(readOnly = true)
     public void export(AppUser user, ExportContext ctx, OutputStream out) throws IOException {
         Instant exportedAt = Instant.now();
         log.info("export.start userId={} exporters={} includeBalanceSnapshots={}",
