@@ -26,13 +26,16 @@ Track bank accounts, brokerage, crypto, and net worth — all in one place.
 
 ## Features
 
-- **Account aggregation** — Bank accounts (LEP, PEA, Livret, current), brokerage, crypto wallets, on-chain addresses
-- **Bank sync** — Enable Banking (PSD2/OAuth, 2000+ EU banks) or Powens/Budget Insight (scraping)
+- **Account aggregation** — Bank accounts (LEP, PEA, Livret, current), brokerage, crypto wallets, on-chain addresses, debts/loans
+- **Bank sync** — Enable Banking (PSD2/OAuth, 2000+ EU banks), Powens/Budget Insight (scraping), and BoursoBank via a Python sidecar
 - **Brokerage sync** — Trade Republic via WebSocket or CSV import
 - **Crypto** — Binance exchange sync, on-chain BTC/ETH/SOL address tracking
 - **Live prices** — CoinGecko (crypto), Yahoo Finance (stocks/ETFs)
 - **Net worth tracking** — Historical snapshots, stacked area charts, per-account breakdown
 - **Savings goals** — Targets with deadlines, progress tracking across accounts
+- **Multi-member family** — One admin manages multiple profiles (children, spouse). Per-resource sharing (`NONE` / `ALL` / `MANUAL`), optional activation links to upgrade a managed profile to a full login.
+- **2FA + Remember Me** — Opt-in TOTP per user, 10 single-use recovery codes, 90-day "Remember Me" cookie with rotating tokens, "Trust this device" to skip TOTP, per-session revocation from settings.
+- **GDPR data export** — Self-service ZIP export (JSON + per-entity CSV) gated by re-authentication, rate-limited to 5/hour.
 - **Finary import** — CSV import or direct API sync
 - **i18n** — English and French
 - **Dark mode** — System/light/dark with flash-free theme switching
@@ -45,18 +48,20 @@ Track bank accounts, brokerage, crypto, and net worth — all in one place.
 │   (Vite/Bun)     │◀────│     (Tomcat :8080)     │     │  (:5432)   │
 └──────────────────┘     └───────────┬────────────┘     └────────────┘
                                      │
-                      ┌──────────────┼──────────────┐
-                      ▼              ▼               ▼
-               Enable Banking   CoinGecko      Yahoo Finance
-               Powens          Binance API    Trade Republic
-               (PSD2/scraping) (crypto)       (WebSocket)
+                      ┌──────────────┼──────────────┬──────────────┐
+                      ▼              ▼               ▼              ▼
+               Enable Banking   CoinGecko      Yahoo Finance   bourso-auth
+               Powens          Binance API    Trade Republic   (Python
+               (PSD2/scraping) (crypto)       (WebSocket)       sidecar)
 ```
 
-- **Ports & Adapters** — `BankConnectorPort`, `PriceProviderPort`, `TradeRepublicPort`, etc. Swap providers without touching business logic.
+- **Ports & Adapters** — `BankConnectorPort`, `PriceProviderPort`, `TradeRepublicPort`, `BoursoPort`, etc. Swap providers without touching business logic.
+- **Two-tier identity** — `AppUser` (auth) → `FamilyMember` (domain). Every entity is scoped by `member_id`; admins can act on behalf of a managed profile via `?memberId=X`.
 - **Flyway** — Versioned database migrations
 - **JWT auth** — HttpOnly cookies, SameSite=Strict, refresh token rotation
-- **AES-256-GCM** — Mandatory encryption for API secrets at rest
-- **Rate limiting** — Bucket4j on login and sync endpoints
+- **2FA (TOTP)** — Opt-in, with hashed recovery codes and trusted-device cookies
+- **AES-256-GCM** — Mandatory encryption for API secrets at rest (Binance, TOTP secrets, bank session tokens)
+- **Rate limiting** — Bucket4j on login, MFA challenge, sync endpoints, and data export
 
 ## Tech stack
 
@@ -81,35 +86,36 @@ git clone https://github.com/Zoeille/picsou-finance.git
 cd picsou-finance
 ```
 
-### 2. Configure
-
-```bash
-cp docker/.env.example docker/.env
-```
-
-Edit `docker/.env` with your credentials:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `POSTGRES_PASSWORD` | Yes | Strong random password |
-| `JWT_SECRET` | Yes | `openssl rand -base64 48` |
-| `APP_USERNAME` | Yes | Your login username |
-| `APP_PASSWORD_HASH` | Yes | `htpasswd -bnBC 12 "" YOUR_PASSWORD \| tr -d ':\r\n'` |
-| `CRYPTO_ENCRYPTION_KEY` | For crypto | `openssl rand -base64 32` |
-| `ENABLEBANKING_*` | For bank sync | From your [Enable Banking dashboard](https://enablebanking.com/) |
-| `TR_PHONE_NUMBER` / `TR_PIN` | For Trade Republic | Your Trade Republic credentials |
-
-> **Note:** The bcrypt hash contains `$` characters. In the `.env` file, write it as-is without quotes. Never export it in a shell without single quotes: `export APP_PASSWORD_HASH='$2a$12$...'`.
-
-### 3. Run
+### 2. Run (zero-config)
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-Open http://localhost:8080 and log in with the credentials you configured.
+On first launch the entrypoint auto-generates `JWT_SECRET`, `CRYPTO_ENCRYPTION_KEY`, and `POSTGRES_PASSWORD` (persisted to the `picsou_data` volume under `/data/.secrets/`). Open http://localhost:8080 — the **setup wizard** walks you through admin credentials, CORS, and (optionally) Enable Banking.
 
-### Enable Banking key setup (optional)
+### 3. Advanced configuration (optional)
+
+If you prefer to seed everything up front (CI, external secret managers, etc.):
+
+```bash
+cp docker/.env.example docker/.env
+```
+
+| Variable | When to set | Description |
+|----------|-------------|-------------|
+| `POSTGRES_PASSWORD` | Override auto-gen | Strong random password |
+| `JWT_SECRET` | Override auto-gen | `openssl rand -base64 48` |
+| `CRYPTO_ENCRYPTION_KEY` | Override auto-gen | `openssl rand -base64 32` |
+| `APP_USERNAME` / `APP_PASSWORD_HASH` | Skip wizard | `htpasswd -bnBC 12 "" YOUR_PASSWORD \| tr -d ':\r\n'` |
+| `ALLOWED_ORIGINS` | Non-localhost | e.g. `http://your-nas-ip:8080` |
+| `SECURE_COOKIES` | Plain HTTP | `false` if no TLS in front |
+| `ENABLEBANKING_*` | Skip wizard | From your [Enable Banking dashboard](https://enablebanking.com/) |
+| `BOURSO_AUTH_URL` | Custom sidecar | Defaults to `http://bourso-auth:8001` |
+
+> **Note:** The bcrypt hash contains `$` characters. In `.env`, write it as-is without quotes. Never export it in a shell without single quotes: `export APP_PASSWORD_HASH='$2a$12$...'`.
+
+### 4. Enable Banking key setup (optional)
 
 ```bash
 mkdir -p docker/secrets
