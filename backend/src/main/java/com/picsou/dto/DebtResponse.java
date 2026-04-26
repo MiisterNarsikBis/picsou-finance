@@ -13,7 +13,9 @@ public record DebtResponse(
     BigDecimal monthlyPayment,
     String lenderName,
     LocalDate startDate,
-    LocalDate endDate
+    LocalDate endDate,
+    BigDecimal insuranceMonthly,
+    BigDecimal fileFees
 ) {
     public static DebtResponse from(Debt d) {
         return new DebtResponse(
@@ -24,7 +26,9 @@ public record DebtResponse(
             d.getMonthlyPayment(),
             d.getLenderName(),
             d.getStartDate(),
-            d.getEndDate()
+            d.getEndDate(),
+            d.getInsuranceMonthly(),
+            d.getFileFees()
         );
     }
 }

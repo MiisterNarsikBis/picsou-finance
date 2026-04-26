@@ -15,5 +15,7 @@ public record DebtRequest(
     @DecimalMin("0") BigDecimal monthlyPayment,
     @Size(max = 100) String lenderName,
     LocalDate startDate,
-    LocalDate endDate
+    LocalDate endDate,
+    @DecimalMin("0") BigDecimal insuranceMonthly,
+    @DecimalMin("0") BigDecimal fileFees
 ) {}

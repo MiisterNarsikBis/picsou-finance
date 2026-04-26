@@ -52,4 +52,10 @@ public class Debt extends AuditableEntity {
 
     @Column(name = "end_date")
     private LocalDate endDate;
+
+    @Column(name = "insurance_monthly", precision = 20, scale = 8)
+    private BigDecimal insuranceMonthly;
+
+    @Column(name = "file_fees", precision = 20, scale = 8)
+    private BigDecimal fileFees;
 }
