@@ -12,8 +12,20 @@ import dev.samstevens.totp.time.TimeProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Clock;
+
 @Configuration
 public class TotpConfig {
+
+    /**
+     * System UTC clock — injectable wherever a service needs deterministic timestamps
+     * (e.g. {@code PersistentSessionService}). Tests can override the bean with a
+     * fixed clock.
+     */
+    @Bean
+    public Clock systemClock() {
+        return Clock.systemUTC();
+    }
 
     @Bean
     public SecretGenerator secretGenerator() {
