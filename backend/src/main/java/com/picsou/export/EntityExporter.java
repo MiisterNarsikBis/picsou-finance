@@ -28,8 +28,17 @@ interface EntityExporter {
     List<String> csvHeader();
 
     /** Stream the entity's rows to CSV and JSON for the given user's scope. */
-    void writeCsv(AppUser user, CsvWriter csv) throws IOException;
+    void writeCsv(AppUser user, ExportContext ctx, CsvWriter csv) throws IOException;
 
     /** Stream the entity's data into the JSON document under {@link #name()}. The generator is positioned to write a value. */
-    void writeJson(AppUser user, JsonGenerator json) throws IOException;
+    void writeJson(AppUser user, ExportContext ctx, JsonGenerator json) throws IOException;
+
+    /**
+     * Whether this exporter should run for the given context. Default: always.
+     * Implementations gate themselves on context flags (e.g. balance snapshots
+     * are opt-in to keep small exports lean).
+     */
+    default boolean enabled(ExportContext ctx) {
+        return true;
+    }
 }

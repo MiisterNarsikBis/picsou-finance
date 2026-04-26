@@ -30,7 +30,7 @@ class ProfileExporter implements EntityExporter {
     }
 
     @Override
-    public void writeCsv(AppUser user, CsvWriter csv) throws IOException {
+    public void writeCsv(AppUser user, ExportContext ctx, CsvWriter csv) throws IOException {
         FamilyMember m = user.getMember();
         csv.writeRow(List.of(
             String.valueOf(user.getId()),
@@ -48,7 +48,7 @@ class ProfileExporter implements EntityExporter {
     }
 
     @Override
-    public void writeJson(AppUser user, JsonGenerator json) throws IOException {
+    public void writeJson(AppUser user, ExportContext ctx, JsonGenerator json) throws IOException {
         FamilyMember m = user.getMember();
         json.writeStartObject();
         json.writeNumberField("user_id", user.getId());

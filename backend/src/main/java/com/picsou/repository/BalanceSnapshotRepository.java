@@ -15,6 +15,8 @@ public interface BalanceSnapshotRepository extends JpaRepository<BalanceSnapshot
         Long accountId, LocalDate from, LocalDate to
     );
 
+    List<BalanceSnapshot> findByAccountIdOrderByDateAsc(Long accountId);
+
     Optional<BalanceSnapshot> findByAccountIdAndDate(Long accountId, LocalDate date);
 
     /** Latest snapshot per account for dashboard aggregate */

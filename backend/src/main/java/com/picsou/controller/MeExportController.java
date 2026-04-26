@@ -3,6 +3,7 @@ package com.picsou.controller;
 import com.picsou.config.RateLimitConfig;
 import com.picsou.dto.ExportRequest;
 import com.picsou.export.DataExportService;
+import com.picsou.export.ExportContext;
 import com.picsou.model.AppUser;
 import com.picsou.service.ReAuthService;
 import io.github.bucket4j.Bucket;
@@ -67,11 +68,12 @@ public class MeExportController {
 
         reAuthService.verify(user, req.reAuth());
 
-        log.warn("export.requested userId={} username={} ip={}",
-            user.getId(), user.getUsername(), httpReq.getRemoteAddr());
+        log.warn("export.requested userId={} username={} ip={} includeBalanceSnapshots={}",
+            user.getId(), user.getUsername(), httpReq.getRemoteAddr(), req.includeBalanceSnapshots());
 
+        ExportContext ctx = new ExportContext(req.includeBalanceSnapshots());
         String filename = "picsou-export-" + user.getUsername() + "-" + filenameTimestamp() + ".zip";
-        StreamingResponseBody body = out -> dataExportService.export(user, out);
+        StreamingResponseBody body = out -> dataExportService.export(user, ctx, out);
 
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/zip"))

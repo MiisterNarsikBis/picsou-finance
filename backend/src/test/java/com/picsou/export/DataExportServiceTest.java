@@ -76,7 +76,7 @@ class DataExportServiceTest {
         when(holdingRepository.findByAccount_Id(100L)).thenReturn(List.of(h));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        service.export(user, out);
+        service.export(user, ExportContext.defaults(), out);
         byte[] zipBytes = out.toByteArray();
 
         Map<String, byte[]> entries = readZip(zipBytes);
@@ -112,7 +112,7 @@ class DataExportServiceTest {
         when(accountRepository.findAllByMemberIdOrderByCreatedAtAsc(42L)).thenReturn(List.of());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        service.export(user, out);
+        service.export(user, ExportContext.defaults(), out);
 
         Map<String, byte[]> entries = readZip(out.toByteArray());
         assertThat(entries).containsKey("data.json").containsKey("accounts.csv").containsKey("holdings.csv");

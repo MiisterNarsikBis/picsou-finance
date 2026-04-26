@@ -40,7 +40,7 @@ class HoldingsExporter implements EntityExporter {
     }
 
     @Override
-    public void writeCsv(AppUser user, CsvWriter csv) throws IOException {
+    public void writeCsv(AppUser user, ExportContext ctx, CsvWriter csv) throws IOException {
         for (AccountHolding h : holdings(user)) {
             csv.writeRow(List.of(
                 String.valueOf(h.getId()),
@@ -58,7 +58,7 @@ class HoldingsExporter implements EntityExporter {
     }
 
     @Override
-    public void writeJson(AppUser user, JsonGenerator json) throws IOException {
+    public void writeJson(AppUser user, ExportContext ctx, JsonGenerator json) throws IOException {
         json.writeStartArray();
         for (AccountHolding h : holdings(user)) {
             json.writeStartObject();

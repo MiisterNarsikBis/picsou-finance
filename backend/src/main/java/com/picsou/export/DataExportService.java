@@ -42,13 +42,14 @@ public class DataExportService {
         this.exporters = exporters;
     }
 
-    public void export(AppUser user, OutputStream out) throws IOException {
+    public void export(AppUser user, ExportContext ctx, OutputStream out) throws IOException {
         Instant exportedAt = Instant.now();
-        log.info("export.start userId={} exporters={}", user.getId(), exporters.size());
+        log.info("export.start userId={} exporters={} includeBalanceSnapshots={}",
+            user.getId(), exporters.size(), ctx.includeBalanceSnapshots());
         try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
             try {
-                writeJson(zip, user, exportedAt);
-                writeCsvEntries(zip, user);
+                writeJson(zip, user, ctx, exportedAt);
+                writeCsvEntries(zip, user, ctx);
                 writeReadme(zip, user, exportedAt);
                 log.info("export.completed userId={}", user.getId());
             } catch (RuntimeException | IOException ex) {
@@ -59,7 +60,7 @@ public class DataExportService {
         }
     }
 
-    private void writeJson(ZipOutputStream zip, AppUser user, Instant exportedAt) throws IOException {
+    private void writeJson(ZipOutputStream zip, AppUser user, ExportContext ctx, Instant exportedAt) throws IOException {
         zip.putNextEntry(new ZipEntry("data.json"));
         try (JsonGenerator json = JSON_FACTORY.createGenerator(zip)) {
             json.setPrettyPrinter(new DefaultPrettyPrinter());
@@ -67,9 +68,11 @@ public class DataExportService {
             json.writeStringField("schema_version", "1");
             json.writeStringField("exported_at", exportedAt.toString());
             json.writeNumberField("user_id", user.getId());
+            json.writeBooleanField("include_balance_snapshots", ctx.includeBalanceSnapshots());
             for (EntityExporter exporter : exporters) {
+                if (!exporter.enabled(ctx)) continue;
                 json.writeFieldName(exporter.name());
-                exporter.writeJson(user, json);
+                exporter.writeJson(user, ctx, json);
             }
             json.writeEndObject();
             json.flush();
@@ -77,12 +80,13 @@ public class DataExportService {
         zip.closeEntry();
     }
 
-    private void writeCsvEntries(ZipOutputStream zip, AppUser user) throws IOException {
+    private void writeCsvEntries(ZipOutputStream zip, AppUser user, ExportContext ctx) throws IOException {
         for (EntityExporter exporter : exporters) {
+            if (!exporter.enabled(ctx)) continue;
             zip.putNextEntry(new ZipEntry(exporter.name() + ".csv"));
             CsvWriter csv = new CsvWriter(zip);
             csv.writeRow(exporter.csvHeader());
-            exporter.writeCsv(user, csv);
+            exporter.writeCsv(user, ctx, csv);
             csv.flush();
             zip.closeEntry();
         }

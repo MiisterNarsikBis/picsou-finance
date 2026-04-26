@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface DebtRepository extends JpaRepository<Debt, Long> {
     Optional<Debt> findByAccountId(Long accountId);
     List<Debt> findByLinkedAccountId(Long linkedAccountId);
+    List<Debt> findAllByMemberId(Long memberId);
 }
