@@ -27,7 +27,7 @@ Track bank accounts, brokerage, crypto, and net worth — all in one place.
 ## Features
 
 - **Account aggregation** — Bank accounts (LEP, PEA, Livret, current), brokerage, crypto wallets, on-chain addresses, debts/loans
-- **Bank sync** — Enable Banking (PSD2/OAuth, 2000+ EU banks). Powens/Budget Insight and BoursoBank adapters ship in the codebase but are **experimental and disabled in 1.0.0**.
+- **Bank sync** — Enable Banking (PSD2/OAuth, 2000+ EU banks).
 - **Brokerage sync** — Trade Republic via WebSocket or CSV import
 - **Crypto** — Binance exchange sync, on-chain BTC/ETH/SOL address tracking
 - **Live prices** — CoinGecko (crypto), Yahoo Finance (stocks/ETFs)
@@ -50,9 +50,8 @@ Track bank accounts, brokerage, crypto, and net worth — all in one place.
                                      │
                       ┌──────────────┼──────────────┬──────────────┐
                       ▼              ▼               ▼              ▼
-               Enable Banking   CoinGecko      Yahoo Finance   bourso-auth
-               Powens          Binance API    Trade Republic   (Python
-               (PSD2/scraping) (crypto)       (WebSocket)       sidecar)
+               Enable Banking   CoinGecko      Yahoo Finance   Trade Republic
+               (PSD2/OAuth)     (crypto)       (stocks/ETF)    (WebSocket)
 ```
 
 - **Ports & Adapters** — `BankConnectorPort`, `PriceProviderPort`, `TradeRepublicPort`, `BoursoPort`, etc. Swap providers without touching business logic.

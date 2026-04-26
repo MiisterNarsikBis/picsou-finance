@@ -10,6 +10,13 @@
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) -- Overview, modules, data flows
 
+## Release deliverables
+
+- [release/1.0.0/](./release/1.0.0/README.md) -- IEEE-style docs for 1.0.0:
+  [SRS](./release/1.0.0/SRS.md), [SDD](./release/1.0.0/SDD.md),
+  [SDS](./release/1.0.0/SDS.md), [STP](./release/1.0.0/STP.md),
+  [User Manual](./release/1.0.0/USER_MANUAL.md)
+
 ## Technical decisions (ADR)
 
 | Date | Decision | Status |
