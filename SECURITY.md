@@ -121,3 +121,9 @@ the UI because they are not yet ready for production:
   the sync page does not show the tab. Backend code and the V23 migration
   remain in place for future work; do **not** re-enable on a public-facing
   instance until it has been reviewed.
+- **Powens / Budget Insight** — `PowensBankConnector` ships in the codebase
+  but has **not** been tested end-to-end against a real Powens tenant. The
+  `@Primary` annotation was removed so Enable Banking stays injected as the
+  canonical `BankConnectorPort` even when `POWENS_CLIENT_ID` is set. Do
+  **not** enable on a production instance until the adapter has been
+  validated.

@@ -66,7 +66,10 @@ loan amortization, GDPR data export, and dozens of refinements.
   syncs, manual-transaction protection, daily scheduler, proactive TOTP
   detection in the Add Account modal (`6c9777e`, `93c7ee0`, `0328533`,
   `1faa1d8`, `0f4bf07`, `fbeb155`).
-- **Powens** adapter (alongside Enable Banking) (`6c9777e`).
+- **Powens** *(experimental, disabled in 1.0.0)*. `PowensBankConnector` ships
+  in the codebase but has not been tested end-to-end against a real Powens
+  tenant; `@Primary` was removed so Enable Banking remains the canonical
+  `BankConnectorPort` even when `POWENS_CLIENT_ID` is set (`6c9777e`).
 - **Crypto exchanges.** Binance integration via `CryptoExchangePort`
   (`b70b2aa`, `aab51c4`).
 - **On-chain wallets.** Bitcoin (xpub, zpub, output descriptors), Ethereum, and

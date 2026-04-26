@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -26,13 +25,17 @@ import java.util.UUID;
  * Powens (Budget Insight) bank connector.
  * https://docs.powens.com/
  *
+ * ⚠ EXPERIMENTAL — UNTESTED IN 1.0.0. Do not enable on production.
+ *
  * Unlike Enable Banking (PSD2-only), Powens uses screen scraping + direct bank agreements,
  * giving access to LEP, PEA, Livrets, and other non-payment accounts.
  *
  * Auth: OAuth webview → code → access_token (stored as session ID in Requisition table).
- * Activated only when POWENS_CLIENT_ID is set to a non-empty value.
+ * Activated only when POWENS_CLIENT_ID is set to a non-empty value. The {@code @Primary}
+ * annotation was removed in 1.0.0 so Enable Banking remains the canonical provider even if
+ * the env vars are set by mistake — until this adapter has been tested end-to-end against a
+ * real Powens tenant, treat it as code that ships disabled.
  */
-@Primary
 @ConditionalOnExpression("'${app.powens.client-id:}'.length() > 0")
 @Component
 public class PowensBankConnector implements BankConnectorPort {

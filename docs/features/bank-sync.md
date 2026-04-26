@@ -1,10 +1,17 @@
 # Feature: Bank Sync
 
-> Last updated: 2026-04-04
+> Last updated: 2026-04-26
+
+> **Status (1.0.0).** Enable Banking is the only enabled provider. The Powens
+> adapter ships in the codebase but is **experimental and untested** —
+> `@Primary` was removed from `PowensBankConnector` so Enable Banking remains
+> injected as the canonical `BankConnectorPort` even when `POWENS_CLIENT_ID`
+> is set. Sections below referring to Powens describe the full design that
+> can be re-enabled once the adapter has been validated end-to-end.
 
 ## Context
 
-Picsou syncs bank accounts from French banks using two providers: Enable Banking (PSD2, open banking) and Powens/Budget Insight (screen scraping). Both are optional and can coexist. Powens takes priority when configured because it accesses account types that PSD2 cannot (LEP, PEA, livrets). The scheduler runs daily auto-sync at 08:00 for all linked requisitions.
+Picsou syncs bank accounts from French banks. In 1.0.0 the active provider is Enable Banking (PSD2, open banking). A second provider — Powens / Budget Insight (screen scraping) — is implemented behind `BankConnectorPort` but disabled because it has not been tested against a real Powens tenant. The scheduler runs daily auto-sync at 08:00 for all linked requisitions.
 
 ## How it works
 
@@ -14,7 +21,7 @@ Both providers implement the `BankConnectorPort` interface with four operations:
 
 **Enable Banking** (`EnableBankingBankConnector`): Uses the PSD2 Bank Account Data API. Auth is JWT-based (RS256 signed with an RSA private key). Sessions are created via OAuth redirect. After the user authorizes, accounts are linked asynchronously and polled up to 8 times with 3-second delays.
 
-**Powens** (`PowensBankConnector`): Uses screen scraping via the Budget Insight API. Auth is an OAuth webview that handles bank selection and credential entry. The OAuth code is exchanged for a permanent access token. Marked `@Primary` + `@ConditionalOnExpression` so it takes over when `POWENS_CLIENT_ID` is set.
+**Powens** (`PowensBankConnector`) — ⚠ experimental, disabled in 1.0.0. Uses screen scraping via the Budget Insight API. Auth is an OAuth webview that handles bank selection and credential entry. The OAuth code is exchanged for a permanent access token. Gated behind `@ConditionalOnExpression` (so it only registers when `POWENS_CLIENT_ID` is set), but `@Primary` was removed for 1.0.0, so Enable Banking remains injected even when the bean is registered.
 
 ### Requisition lifecycle
 
@@ -29,7 +36,7 @@ Both providers implement the `BankConnectorPort` interface with four operations:
 ### Key files
 
 - `adapter/EnableBankingBankConnector.java` -- PSD2 adapter (RSA JWT, async account linking)
-- `adapter/PowensBankConnector.java` -- Scraping adapter (`@Primary`, OAuth webview)
+- `adapter/PowensBankConnector.java` -- Scraping adapter (experimental, OAuth webview; `@Primary` removed in 1.0.0)
 - `port/BankConnectorPort.java` -- Port interface with `AccountData`, `InstitutionData` records
 - `service/SyncService.java` -- Orchestration: initiate, complete, retry, resync, type detection
 - `controller/SyncController.java` -- REST endpoints under `/api/sync/`
@@ -80,7 +87,7 @@ SchedulerService.dailyBankSync() --> SyncService.resyncAll()
 
 ## Gotchas / Pitfalls
 
-- **Powens is `@Primary`**: When `POWENS_CLIENT_ID` is set, Spring injects `PowensBankConnector` as the `BankConnectorPort`. Enable Banking is still registered but never injected. To switch back, unset the env var.
+- **Powens is disabled in 1.0.0**: `@Primary` was removed from `PowensBankConnector`, so even setting `POWENS_CLIENT_ID` will NOT activate Powens — Enable Banking stays injected. To re-enable after validating the adapter, restore `@Primary` on `PowensBankConnector` and set `POWENS_CLIENT_ID`.
 - **Enable Banking RSA key**: The private key must be PKCS8 PEM format. The `ENABLEBANKING_PRIVATE_KEY` env var can contain literal `\n` characters -- both formats are handled in `parsePrivateKey()`.
 - **Enable Banking redirect URI must be registered**: `ENABLEBANKING_REDIRECT_URI` defaults to `http://localhost:5173/sync/callback` (dev only). In production, set it to `http://<host>:8080/sync/callback` in `.env`. The same URL must be registered in the Enable Banking developer portal under the application's Redirect URIs. A mismatch causes a `REDIRECT_URI_NOT_ALLOWED` 400 error at auth initiation — it surfaces in the Add Account modal bank wizard.
 - **ALREADY_AUTHORIZED**: If the OAuth code is reused (e.g. browser back button), `SyncService.completeConnection()` catches the error and falls back to refreshing the latest linked session instead of failing.

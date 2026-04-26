@@ -1,7 +1,16 @@
 # ADR: Dual Bank Providers (Enable Banking + Powens)
 
 > Date: 2026-03-01
-> Status: ✅ Active
+> Status: ⚠️ Revised (2026-04-26) — Powens marked experimental, disabled in 1.0.0
+
+> **What changed (2026-04-26).** The Powens adapter ships in 1.0.0 but has
+> NOT been tested end-to-end against a real Powens tenant. The `@Primary`
+> annotation was removed from `PowensBankConnector`, so even if
+> `POWENS_CLIENT_ID` is set, Enable Banking remains the canonical
+> `BankConnectorPort` implementation. The "zero-config switching"
+> behaviour described below is therefore inactive in 1.0.0 — re-enabling
+> Powens means re-adding `@Primary` once the adapter has been validated.
+> The reasoning below is preserved as historical context.
 
 ## Context
 

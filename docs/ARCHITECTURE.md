@@ -41,7 +41,8 @@ com.picsou/
 ├── port/           Port interfaces (BankConnectorPort, PriceProviderPort,
 │                   TradeRepublicPort, CryptoExchangePort, WalletPort, BoursoPort)
 ├── adapter/        Port implementations + util/BitcoinKeyUtils
-│   ├── EnableBankingBankConnector, PowensBankConnector (bank sync)
+│   ├── EnableBankingBankConnector (bank sync)
+│   ├── PowensBankConnector (Powens / Budget Insight — experimental, disabled in 1.0.0)
 │   ├── BoursoAdapter (BoursoBank — disabled in 1.0.0)
 │   ├── CoinGeckoPriceProvider, YahooFinancePriceProvider (prices)
 │   ├── OpenFigiIsinConverter (ISIN → Yahoo ticker)
@@ -88,10 +89,10 @@ frontend/src/
 ### 1. Bank sync
 
 ```
-Client → SyncController → SyncService → BankConnectorPort → Enable Banking / Powens
+Client → SyncController → SyncService → BankConnectorPort → Enable Banking
 ```
 
-Dual-provider: Powens (scraping, `@Primary`) and Enable Banking (PSD2). Powens takes over when `POWENS_CLIENT_ID` is set. `SyncService.detectType()` maps provider types to `AccountType` enum.
+Enable Banking (PSD2) is the canonical `BankConnectorPort` in 1.0.0. The Powens adapter (`PowensBankConnector`) ships in the codebase behind `@ConditionalOnExpression` but is **experimental and untested** — `@Primary` was removed for 1.0.0 so Enable Banking remains injected even when `POWENS_CLIENT_ID` is set. `SyncService.detectType()` maps provider types to the `AccountType` enum.
 
 ### 2. Price refresh
 
@@ -201,7 +202,7 @@ Computed on the fly from `Debt` (principal, rate, term, fees) — no per-month r
 | PostgreSQL 16 | Persistence | `SPRING_DATASOURCE_URL` |
 | Flyway | Schema migrations | `db/migration/` (latest V29) |
 | Enable Banking | PSD2 bank sync (optional) | `ENABLEBANKING_*` |
-| Powens / Budget Insight | Scraping bank sync (optional, priority) | `POWENS_*` |
+| Powens / Budget Insight | Scraping bank sync (**experimental, disabled in 1.0.0**) | `POWENS_*` |
 | Trade Republic | Broker sync via Python microservice | `TR_AUTH_URL` |
 | BoursoBank | Bank sync via Python sidecar (**disabled in 1.0.0**) | `BOURSO_AUTH_URL` |
 | Binance | Crypto exchange balances | Via CryptoExchangePort |
@@ -230,3 +231,8 @@ Computed on the fly from `Debt` (principal, rate, term, fees) — no per-month r
   ship in 1.0.0 but the sidecar is commented out in `docker-compose.yml` and all
   UI entry points (setup wizard catalog, sync tab, admin toggle) are hidden.
   Re-enable only after the integration is finished and reviewed.
+- **Powens / Budget Insight** — `PowensBankConnector` ships in 1.0.0 but is
+  experimental and has not been tested end-to-end against a real Powens tenant.
+  The `@Primary` annotation was removed so Enable Banking remains the injected
+  `BankConnectorPort` even when `POWENS_CLIENT_ID` is set. Re-enable by
+  re-adding `@Primary` once the adapter has been validated.

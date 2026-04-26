@@ -27,7 +27,7 @@ Track bank accounts, brokerage, crypto, and net worth — all in one place.
 ## Features
 
 - **Account aggregation** — Bank accounts (LEP, PEA, Livret, current), brokerage, crypto wallets, on-chain addresses, debts/loans
-- **Bank sync** — Enable Banking (PSD2/OAuth, 2000+ EU banks), Powens/Budget Insight (scraping), and BoursoBank via a Python sidecar
+- **Bank sync** — Enable Banking (PSD2/OAuth, 2000+ EU banks). Powens/Budget Insight and BoursoBank adapters ship in the codebase but are **experimental and disabled in 1.0.0**.
 - **Brokerage sync** — Trade Republic via WebSocket or CSV import
 - **Crypto** — Binance exchange sync, on-chain BTC/ETH/SOL address tracking
 - **Live prices** — CoinGecko (crypto), Yahoo Finance (stocks/ETFs)
