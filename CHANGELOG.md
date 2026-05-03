@@ -5,6 +5,60 @@ All notable changes to Picsou are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-05-03
+
+Hotfix bundle from a tester's first evening on 1.0.0 — onboarding friction,
+sync regressions, and a recovery escape hatch (`9297246`).
+
+### Added
+
+- **Solana SPL token support.** `SolanaWalletAdapter` now also calls
+  `getTokenAccountsByOwner` and surfaces known stablecoins (USDC, EURC,
+  USDT) alongside the native SOL balance. `WalletPort.fetchBalance` →
+  `fetchBalances` returning `List<WalletBalance>`; Ethereum and Bitcoin
+  adapters adapted to the list signature (`9297246`).
+- **Admin password recovery.** `ADMIN_RECOVERY_ENABLED=true` env flag
+  triggers an `ApplicationRunner` at boot that mints a 1-hour activation
+  token for the admin account, bumps `tokenVersion` to invalidate active
+  sessions, and prints the URL to the logs. Documented in
+  `docs/features/admin-recovery.md` (`9297246`).
+- **CORS reload from environment.** New `POST /api/admin/settings/cors/reload-from-env`
+  endpoint plus a "Reload from environment" button in the admin Security
+  panel — escape hatch when the operator changes the public URL after the
+  setup wizard ran (`9297246`).
+- **Enable Banking onboarding warnings.** SANDBOX vs PRODUCTION warning
+  banner on step 1 and a mandatory acknowledgement checkbox on the
+  credentials step. PSD2 scope note (current accounts only) on step 1 and
+  in `BankSyncTab` so users know to add PEA / Livret A elsewhere
+  (`9297246`).
+
+### Fixed
+
+- **Setup wizard intro no longer feels stuck.** `HelloGreeting` cadence
+  cut from ~19 s to ~7.8 s; explicit Skip button and a 5 s watchdog so a
+  stalled font/i18n load can never block the wizard (`9297246`).
+- **Deleted accounts no longer reappear after sync.** Account model
+  now soft-deletes via `@SQLRestriction("deleted_at IS NULL")`; sync
+  upserts in `SyncService`, `TradeRepublicSyncService`, and
+  `CryptoExchangeSyncService` refuse to resurrect accounts the user
+  removed. Migration `V30__account_soft_delete.sql` (`9297246`).
+- **Add-account no longer 502s.** `EnableBankingBankConnector` polling
+  capped at 4.5 s (3 × 1.5 s) instead of 24 s; if the session has not
+  been linked yet, the adapter returns `[]` and `SyncService` marks the
+  requisition `FAILED` so the existing UI retry button takes over. nginx
+  `/api` locations now have 60 s read-timeout headroom in all three
+  configs (`9297246`).
+- **Pre-existing test regression.** `SetupServiceTest` stubbed
+  `findByUsername` while production calls `findByUsernameWithMember` —
+  silently broken since the schema-with-member refactor (`9297246`).
+
+### Database migrations
+
+- `V30__account_soft_delete.sql` — adds `deleted_at TIMESTAMP NULL` and
+  an index on `account` (`9297246`).
+
+---
+
 ## [1.0.0] — 2026-04-26
 
 First stable release. Builds on the MVP (commit `37920d1`) by adding multi-member
