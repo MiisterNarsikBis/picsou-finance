@@ -14,6 +14,7 @@ import com.picsou.model.GoalManualContribution;
 import com.picsou.model.GoalMonthOverride;
 import com.picsou.repository.AccountRepository;
 import com.picsou.repository.BalanceSnapshotRepository;
+import com.picsou.repository.FamilyMemberRepository;
 import com.picsou.repository.GoalManualContributionRepository;
 import com.picsou.repository.GoalMonthOverrideRepository;
 import com.picsou.repository.GoalRepository;
@@ -42,6 +43,7 @@ public class GoalService {
     private final AccountService accountService;
     private final GoalMonthOverrideRepository overrideRepository;
     private final GoalManualContributionRepository manualContributionRepository;
+    private final FamilyMemberRepository familyMemberRepository;
     private final HistoryService historyService;
 
     public GoalService(
@@ -51,6 +53,7 @@ public class GoalService {
         AccountService accountService,
         GoalMonthOverrideRepository overrideRepository,
         GoalManualContributionRepository manualContributionRepository,
+        FamilyMemberRepository familyMemberRepository,
         HistoryService historyService
     ) {
         this.goalRepository = goalRepository;
@@ -59,6 +62,7 @@ public class GoalService {
         this.accountService = accountService;
         this.overrideRepository = overrideRepository;
         this.manualContributionRepository = manualContributionRepository;
+        this.familyMemberRepository = familyMemberRepository;
         this.historyService = historyService;
     }
 
@@ -272,6 +276,9 @@ public class GoalService {
             .findByGoalIdAndYearMonth(goalId, yearMonth)
             .orElseGet(GoalManualContribution::new);
         entry.setGoal(goal);
+        if (entry.getMember() == null) {
+            entry.setMember(familyMemberRepository.getReferenceById(memberId));
+        }
         entry.setYearMonth(yearMonth);
         entry.setAmount(amount);
         manualContributionRepository.save(entry);
