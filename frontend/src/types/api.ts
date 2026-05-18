@@ -123,6 +123,7 @@ export interface GoalProgress {
   name: string
   targetAmount: number
   deadline: string
+  createdAt: string
   accounts: Account[]
   currentTotal: number
   percentComplete: number

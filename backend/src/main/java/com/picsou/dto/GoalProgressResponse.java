@@ -3,6 +3,7 @@ package com.picsou.dto;
 import com.picsou.model.Goal;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -11,6 +12,7 @@ public record GoalProgressResponse(
     String name,
     BigDecimal targetAmount,
     LocalDate deadline,
+    Instant createdAt,
     List<AccountResponse> accounts,
     BigDecimal currentTotal,
     BigDecimal percentComplete,
@@ -36,6 +38,7 @@ public record GoalProgressResponse(
             goal.getName(),
             goal.getTargetAmount(),
             goal.getDeadline(),
+            goal.getCreatedAt(),
             accounts,
             currentTotal,
             percentComplete,

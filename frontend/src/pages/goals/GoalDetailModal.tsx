@@ -92,6 +92,13 @@ export function GoalDetailModal({ goalId, onClose }: GoalDetailModalProps) {
                   data={history}
                   range={range}
                   onRangeChange={setRange}
+                  target={{
+                    startDate: goal.createdAt,
+                    startValue: 0,
+                    endDate: goal.deadline,
+                    endValue: goal.targetAmount,
+                    label: t('goals.targetAmount'),
+                  }}
                 />
               )}
 

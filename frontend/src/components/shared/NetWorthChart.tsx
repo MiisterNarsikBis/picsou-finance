@@ -15,6 +15,16 @@ interface NetWorthChartProps {
   // Hide the "Capital invested" dashed line + legend entry. When omitted, the
   // line is shown only if at least one data point carries `invested`.
   showInvested?: boolean
+  // Optional ideal-trajectory overlay: linear line from (startDate, startValue)
+  // to (endDate, endValue). On ALL range, X axis is stretched to endDate so the
+  // user can see the projection beyond today.
+  target?: {
+    startDate: string  // ISO instant or date
+    startValue: number
+    endDate: string    // ISO date
+    endValue: number
+    label: string      // tooltip + legend label
+  }
 }
 
 function NetWorthTooltip({ active, payload, labels, is24H }: {
@@ -22,23 +32,28 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
   payload?: Array<{
     value: number
     dataKey: string
-    payload: { date?: string; timestamp?: string; total: number; invested?: number }
+    payload: { date?: string; timestamp?: string; total: number | null; invested?: number; target?: number }
   }>
-  labels: { total: string; invested: string; gainLoss: string; locale: string; currency: string }
+  labels: { total: string; invested: string; target: string; gainLoss: string; locale: string; currency: string }
   is24H: boolean
 }) {
   if (!active || !payload?.length) return null
 
-  const totalItem = payload.find(p => p.dataKey === 'total')
-  if (!totalItem) return null
+  // Prefer the total item for label/date; fall back to any payload entry so the
+  // tooltip still works for synthetic future points where total is null.
+  const totalItem = payload.find(p => p.dataKey === 'total' && p.value != null)
+  const anchorItem = totalItem ?? payload[0]
+  if (!anchorItem) return null
 
-  const total = totalItem.value as number
-  const investedItem = payload.find(p => p.dataKey === 'invested')
+  const total = totalItem ? (totalItem.value as number) : null
+  const investedItem = payload.find(p => p.dataKey === 'invested' && p.value != null)
   const hasInvested = investedItem != null
   const invested = hasInvested ? (investedItem.value as number) : 0
-  const gainLoss = hasInvested ? total - invested : null
+  const gainLoss = total != null && hasInvested ? total - invested : null
+  const targetItem = payload.find(p => p.dataKey === 'target' && p.value != null)
+  const target = targetItem ? (targetItem.value as number) : null
 
-  const dateStr = is24H ? totalItem.payload?.timestamp : totalItem.payload?.date
+  const dateStr = is24H ? anchorItem.payload?.timestamp : anchorItem.payload?.date
   const formattedDate = is24H && dateStr
     ? new Date(dateStr).toLocaleString(labels.locale, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })
     : formatDate(dateStr, labels.locale)
@@ -46,16 +61,18 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
   return (
     <div className="rounded-xl bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10">
       <div className="mb-1.5 font-medium">{formattedDate}</div>
-      <div className="flex items-center gap-2 py-0.5">
-        <div
-          className="h-0.5 w-4 shrink-0 rounded-full"
-          style={{ backgroundColor: 'var(--color-total)' }}
-        />
-        <span className="text-muted-foreground">{labels.total}</span>
-        <span className="ml-auto font-mono font-medium tabular-nums">
-          {formatCurrency(total, labels.currency, labels.locale)}
-        </span>
-      </div>
+      {total != null && (
+        <div className="flex items-center gap-2 py-0.5">
+          <div
+            className="h-0.5 w-4 shrink-0 rounded-full"
+            style={{ backgroundColor: 'var(--color-total)' }}
+          />
+          <span className="text-muted-foreground">{labels.total}</span>
+          <span className="ml-auto font-mono font-medium tabular-nums">
+            {formatCurrency(total, labels.currency, labels.locale)}
+          </span>
+        </div>
+      )}
       {hasInvested && (
         <div className="flex items-center gap-2 py-0.5">
           <div
@@ -65,6 +82,18 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
           <span className="text-muted-foreground">{labels.invested}</span>
           <span className="ml-auto font-mono font-medium tabular-nums">
             {formatCurrency(invested, labels.currency, labels.locale)}
+          </span>
+        </div>
+      )}
+      {target != null && (
+        <div className="flex items-center gap-2 py-0.5">
+          <div
+            className="h-0.5 w-4 shrink-0 border-t-2 border-dashed"
+            style={{ borderColor: 'var(--color-target)' }}
+          />
+          <span className="text-muted-foreground">{labels.target}</span>
+          <span className="ml-auto font-mono font-medium tabular-nums">
+            {formatCurrency(target, labels.currency, labels.locale)}
           </span>
         </div>
       )}
@@ -115,23 +144,60 @@ function getXAxisFormatter(range: TimeRange, locale: string) {
   }
 }
 
-export function NetWorthChart({ data, intraday = [], range, onRangeChange, showInvested = true }: NetWorthChartProps) {
+export function NetWorthChart({ data, intraday = [], range, onRangeChange, showInvested = true, target }: NetWorthChartProps) {
   const { t } = useTranslation()
   const locale = t('common.locale')
   const is24H = range === '24H'
   const showDots = range === '24H' || range === '7D'
 
-  const filteredData = useMemo(() => {
-    if (is24H) {
-      return intraday.map(p => ({
-        date: p.timestamp,
-        timestamp: p.timestamp,
-        total: p.total,
-        invested: p.invested,
-      }))
+  const targetAt = useMemo(() => {
+    if (!target) return null
+    const startMs = new Date(target.startDate).getTime()
+    const endMs = new Date(target.endDate).getTime()
+    const span = endMs - startMs
+    if (!Number.isFinite(span) || span <= 0) return null
+    const slope = (target.endValue - target.startValue) / span
+    return (iso: string) => {
+      const t = new Date(iso).getTime()
+      if (!Number.isFinite(t)) return null
+      const clamped = Math.min(Math.max(t, startMs), endMs)
+      return target.startValue + slope * (clamped - startMs)
     }
-    return filterByRange(data, range)
-  }, [data, intraday, range, is24H])
+  }, [target])
+
+  const filteredData = useMemo(() => {
+    const base = is24H
+      ? intraday.map(p => ({
+          date: p.timestamp,
+          timestamp: p.timestamp,
+          total: p.total as number | null,
+          invested: p.invested,
+        }))
+      : filterByRange(data, range).map(p => ({ ...p, total: p.total as number | null }))
+
+    // Decorate each visible point with the interpolated target value.
+    const decorated = targetAt
+      ? base.map(p => ({ ...p, target: targetAt(p.date) ?? undefined }))
+      : base
+
+    // On the ALL range, project the X axis up to the deadline so the user sees
+    // the full trajectory. The synthetic point carries only `target` -- the
+    // actual line stops where real data ends.
+    if (target && range === 'ALL' && targetAt) {
+      const last = decorated[decorated.length - 1]
+      const deadlineMs = new Date(target.endDate).getTime()
+      const lastMs = last ? new Date(last.date).getTime() : -Infinity
+      if (Number.isFinite(deadlineMs) && deadlineMs > lastMs) {
+        decorated.push({
+          date: target.endDate,
+          total: null,
+          invested: undefined,
+          target: target.endValue,
+        } as typeof decorated[number])
+      }
+    }
+    return decorated
+  }, [data, intraday, range, is24H, target, targetAt])
 
   const xInterval = useMemo(() => {
     const len = filteredData.length
@@ -140,7 +206,12 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
   }, [filteredData.length])
 
   const yTickFormatter = useMemo(() => {
-    const maxVal = filteredData.length ? Math.max(...filteredData.map(d => d.total)) : 0
+    const totals: number[] = []
+    for (const d of filteredData) {
+      if (d.total != null) totals.push(d.total)
+      if ('target' in d && typeof d.target === 'number') totals.push(d.target)
+    }
+    const maxVal = totals.length ? Math.max(...totals) : 0
     if (maxVal >= 1_000_000) return (v: number) => `${(v / 1_000_000).toFixed(1)}M`
     if (maxVal >= 100_000) return (v: number) => `${(v / 1_000).toFixed(0)}k`
     if (maxVal >= 10_000) return (v: number) => `${(v / 1_000).toFixed(1)}k`
@@ -158,15 +229,20 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
       label: t('dashboard.invested'),
       color: 'var(--chart-5)',
     },
-  }) satisfies ChartConfig, [t])
+    target: {
+      label: target?.label ?? '',
+      color: 'var(--chart-3)',
+    },
+  }) satisfies ChartConfig, [t, target?.label])
 
   const labels = useMemo(() => ({
     total: t('dashboard.netWorth'),
     invested: t('dashboard.invested'),
+    target: target?.label ?? '',
     gainLoss: t('dashboard.gainLoss'),
     locale: t('common.locale'),
     currency: t('common.currency'),
-  }), [t])
+  }), [t, target?.label])
 
   const xAxisFormatter = useMemo(() => getXAxisFormatter(range, locale), [range, locale])
 
@@ -175,6 +251,7 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
   // The dashed "Capital invested" line is only drawn when the caller opts in
   // AND the data actually carries an `invested` value -- prevents legend lies.
   const hasInvestedSeries = showInvested && filteredData.some(d => d.invested != null)
+  const hasTargetSeries = target != null && filteredData.some(d => 'target' in d && typeof d.target === 'number')
 
   return (
     <div>
@@ -230,8 +307,20 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
             activeDot={false}
           />
         )}
+        {hasTargetSeries && (
+          <Line
+            dataKey="target"
+            type="linear"
+            stroke="var(--color-target)"
+            strokeWidth={2}
+            strokeDasharray="4 4"
+            dot={false}
+            activeDot={false}
+            connectNulls
+          />
+        )}
         <Legend content={() => (
-          <div className="flex items-center justify-center gap-5 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 pt-2">
             <div className="flex items-center gap-1.5 text-xs">
               <div
                 className="h-0.5 w-4 rounded-full"
@@ -246,6 +335,15 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
                   style={{ borderColor: 'var(--color-invested)' }}
                 />
                 <span className="text-muted-foreground">{labels.invested}</span>
+              </div>
+            )}
+            {hasTargetSeries && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <div
+                  className="h-0.5 w-4 border-t-2 border-dashed"
+                  style={{ borderColor: 'var(--color-target)' }}
+                />
+                <span className="text-muted-foreground">{labels.target}</span>
               </div>
             )}
           </div>
