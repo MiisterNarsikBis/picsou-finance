@@ -188,4 +188,37 @@ class GoalServiceTest {
 
         assertThat(progress.isOnTrack()).isTrue();
     }
+
+    @Test
+    void isOnTrack_true_whenNoPastMonthHasData() {
+        // Goal created this month → no past months → benefit of the doubt.
+        Account account = Account.builder()
+            .id(1L).name("LEP").type(AccountType.LEP)
+            .currency("EUR").currentBalance(BigDecimal.ZERO)
+            .color("#000").build();
+
+        Goal goal = Goal.builder()
+            .id(1L).name("Tout neuf").targetAmount(new BigDecimal("10000"))
+            .deadline(LocalDate.now().plusMonths(6))
+            .accounts(List.of(account))
+            .build();
+        org.springframework.test.util.ReflectionTestUtils.setField(goal, "createdAt", java.time.Instant.now());
+
+        when(accountService.toResponse(account)).thenReturn(
+            new com.picsou.dto.AccountResponse(
+                1L, "LEP", AccountType.LEP, null, "EUR",
+                BigDecimal.ZERO, BigDecimal.ZERO,
+                null, true, "#000", null, null, null, null
+            )
+        );
+        when(accountService.liveBalanceEur(account)).thenReturn(BigDecimal.ZERO);
+        when(snapshotRepository.findRecentByAccountId(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.any()
+        )).thenReturn(List.of());
+
+        GoalProgressResponse progress = goalService.toProgressResponse(goal);
+
+        assertThat(progress.isOnTrack()).isTrue();
+    }
 }
