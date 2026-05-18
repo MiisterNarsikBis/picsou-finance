@@ -30,6 +30,41 @@ export function GoalDetailModal({ goalId, onClose }: GoalDetailModalProps) {
   const open = goalId != null
   const isLoading = goalLoading || historyLoading
 
+  // Baseline = balance at goal creation. We need this so the ideal trajectory
+  // is drawn in the same reference frame as the live area (which starts from
+  // the linked accounts' pre-goal balance, not from zero). Without it, the
+  // dashed target line floats far below the data and the chart looks rosy
+  // even when the "behind" badge fires.
+  const baseline = useMemo(() => {
+    if (!goal || !history?.length) return 0
+    const createdMs = new Date(goal.createdAt).getTime()
+    if (!Number.isFinite(createdMs)) return 0
+    // First snapshot at or after createdAt is the closest proxy for "balance
+    // at creation". History is sorted ascending by the backend.
+    const firstKept = history.find(p => new Date(p.date).getTime() >= createdMs)
+    return firstKept?.total ?? history[0]?.total ?? 0
+  }, [goal, history])
+
+  // Captured once at mount -- the "today" marker doesn't need to drift live as
+  // the user interacts with the modal. Shared by the projection start and the
+  // chart's vertical guide so they always line up.
+  const [todayMs] = useState(() => Date.now())
+
+  // "At current pace" forecast: where the user lands at deadline if they keep
+  // contributing at the trailing 3-month average. Null when we lack the data
+  // to draw it honestly.
+  const projection = useMemo(() => {
+    if (!goal || goal.avgMonthlyContribution == null) return undefined
+    const endValue = goal.currentTotal + goal.avgMonthlyContribution * Math.max(goal.monthsLeft, 0)
+    return {
+      startDate: new Date(todayMs).toISOString(),
+      startValue: goal.currentTotal,
+      endDate: goal.deadline,
+      endValue,
+      label: t('goals.atCurrentPace'),
+    }
+  }, [goal, t, todayMs])
+
   const statusBadge = goal
     ? (() => {
         if (goal.monthlyNeeded <= 0) {
@@ -92,13 +127,17 @@ export function GoalDetailModal({ goalId, onClose }: GoalDetailModalProps) {
                   data={history}
                   range={range}
                   onRangeChange={setRange}
+                  showInvested={false}
                   target={{
                     startDate: goal.createdAt,
-                    startValue: 0,
+                    startValue: baseline,
                     endDate: goal.deadline,
                     endValue: goal.targetAmount,
                     label: t('goals.targetAmount'),
                   }}
+                  projection={projection}
+                  todayMs={todayMs}
+                  todayLabel={t('common.today')}
                 />
               )}
 

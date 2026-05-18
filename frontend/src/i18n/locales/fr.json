@@ -15,6 +15,7 @@
     "close": "Fermer",
     "yes": "Oui",
     "no": "Non",
+    "today": "Aujourd'hui",
     "currency": "EUR",
     "locale": "fr-FR"
   },
@@ -260,7 +261,8 @@
     "noData": "—",
     "futureMonth": "···",
     "linkedAccounts": "Comptes liés",
-    "history": "Historique"
+    "history": "Historique",
+    "atCurrentPace": "Au rythme actuel"
   },
   "addAccount": {
     "title": "Ajouter un compte",

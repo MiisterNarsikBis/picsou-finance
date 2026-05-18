@@ -1,11 +1,19 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Area, AreaChart, CartesianGrid, Legend, Line, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, Legend, Line, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { type ChartConfig, ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { TimeRangeSelector, type TimeRange } from '@/components/shared/TimeRangeSelector'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { EmptyChartState } from '@/components/shared/EmptyChartState'
 import type { IntradayPoint } from '@/features/dashboard/api'
+
+interface TrajectoryOverlay {
+  startDate: string  // ISO instant or date
+  startValue: number
+  endDate: string    // ISO date
+  endValue: number
+  label: string      // tooltip + legend label
+}
 
 interface NetWorthChartProps {
   data: { date: string; total: number; invested?: number }[]
@@ -16,15 +24,18 @@ interface NetWorthChartProps {
   // line is shown only if at least one data point carries `invested`.
   showInvested?: boolean
   // Optional ideal-trajectory overlay: linear line from (startDate, startValue)
-  // to (endDate, endValue). On ALL range, X axis is stretched to endDate so the
-  // user can see the projection beyond today.
-  target?: {
-    startDate: string  // ISO instant or date
-    startValue: number
-    endDate: string    // ISO date
-    endValue: number
-    label: string      // tooltip + legend label
-  }
+  // to (endDate, endValue). Clamps outside its span. On ALL range, X axis is
+  // stretched to endDate so the user can see the projection beyond today.
+  target?: TrajectoryOverlay
+  // Optional forecast overlay: same shape as target, but only rendered from
+  // startDate onward (null before). Use for "at current pace" projections that
+  // should visually continue past the last real data point.
+  projection?: TrajectoryOverlay
+  // Optional vertical reference line at a given timestamp (ms). Used to anchor
+  // the boundary between past data and future projection.
+  todayMs?: number
+  // Optional label for the today reference line.
+  todayLabel?: string
 }
 
 function NetWorthTooltip({ active, payload, labels, is24H }: {
@@ -32,9 +43,9 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
   payload?: Array<{
     value: number
     dataKey: string
-    payload: { date?: string; timestamp?: string; total: number | null; invested?: number; target?: number }
+    payload: { date?: string; timestamp?: string; total: number | null; invested?: number; target?: number; projection?: number }
   }>
-  labels: { total: string; invested: string; target: string; gainLoss: string; locale: string; currency: string }
+  labels: { total: string; invested: string; target: string; projection: string; gainLoss: string; locale: string; currency: string }
   is24H: boolean
 }) {
   if (!active || !payload?.length) return null
@@ -52,6 +63,8 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
   const gainLoss = total != null && hasInvested ? total - invested : null
   const targetItem = payload.find(p => p.dataKey === 'target' && p.value != null)
   const target = targetItem ? (targetItem.value as number) : null
+  const projectionItem = payload.find(p => p.dataKey === 'projection' && p.value != null)
+  const projection = projectionItem ? (projectionItem.value as number) : null
 
   const dateStr = is24H ? anchorItem.payload?.timestamp : anchorItem.payload?.date
   const formattedDate = is24H && dateStr
@@ -94,6 +107,18 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
           <span className="text-muted-foreground">{labels.target}</span>
           <span className="ml-auto font-mono font-medium tabular-nums">
             {formatCurrency(target, labels.currency, labels.locale)}
+          </span>
+        </div>
+      )}
+      {projection != null && (
+        <div className="flex items-center gap-2 py-0.5">
+          <div
+            className="h-0.5 w-4 shrink-0 border-t-2 border-dotted"
+            style={{ borderColor: 'var(--color-projection)' }}
+          />
+          <span className="text-muted-foreground">{labels.projection}</span>
+          <span className="ml-auto font-mono font-medium tabular-nums">
+            {formatCurrency(projection, labels.currency, labels.locale)}
           </span>
         </div>
       )}
@@ -150,7 +175,7 @@ function getXAxisFormatter(range: TimeRange, locale: string, spanMs: number) {
     new Date(value).toLocaleDateString(locale, { month: 'short', year: '2-digit' })
 }
 
-export function NetWorthChart({ data, intraday = [], range, onRangeChange, showInvested = true, target }: NetWorthChartProps) {
+export function NetWorthChart({ data, intraday = [], range, onRangeChange, showInvested = true, target, projection, todayMs, todayLabel }: NetWorthChartProps) {
   const { t } = useTranslation()
   const locale = t('common.locale')
   const is24H = range === '24H'
@@ -170,6 +195,25 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
       return target.startValue + slope * (clamped - startMs)
     }
   }, [target])
+
+  // Unlike `targetAt`, the projection only exists from its start onward -- it
+  // is a forecast, not a frame for historical data. Returns null before the
+  // start, linearly interpolates between start and end (clamped on the right
+  // so the line doesn't drift past the deadline).
+  const projectionAt = useMemo(() => {
+    if (!projection) return null
+    const startMs = new Date(projection.startDate).getTime()
+    const endMs = new Date(projection.endDate).getTime()
+    const span = endMs - startMs
+    if (!Number.isFinite(span) || span <= 0) return null
+    const slope = (projection.endValue - projection.startValue) / span
+    return (iso: string) => {
+      const t = new Date(iso).getTime()
+      if (!Number.isFinite(t) || t < startMs) return null
+      const clamped = Math.min(t, endMs)
+      return projection.startValue + slope * (clamped - startMs)
+    }
+  }, [projection])
 
   const filteredData = useMemo(() => {
     const base = is24H
@@ -196,16 +240,19 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
       return base.filter(p => p.dateMs >= startMs)
     })()
 
-    // Decorate each visible point with the interpolated target value.
-    const decorated = targetAt
-      ? cropped.map(p => ({ ...p, target: targetAt(p.date) ?? undefined }))
-      : cropped
+    // Decorate each visible point with the interpolated target/projection.
+    const decorated = cropped.map(p => ({
+      ...p,
+      target: targetAt ? (targetAt(p.date) ?? undefined) : undefined,
+      projection: projectionAt ? (projectionAt(p.date) ?? undefined) : undefined,
+    }))
 
     // On the ALL range, project the X axis up to the deadline so the user sees
-    // the full trajectory. The synthetic point carries only `target` -- the
-    // actual line stops where real data ends. With the time-scale axis, this
-    // point is placed at its real date so the projection occupies the right
-    // fraction of the chart instead of being squished into the last category.
+    // the full trajectory. The synthetic point carries only target/projection
+    // -- the actual area stops where real data ends. With the time-scale axis,
+    // this point is placed at its real date so the projection occupies the
+    // right fraction of the chart instead of being squished into the last
+    // category.
     if (target && range === 'ALL' && targetAt) {
       const last = decorated[decorated.length - 1]
       const deadlineMs = new Date(target.endDate).getTime()
@@ -217,11 +264,12 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
           total: null,
           invested: undefined,
           target: target.endValue,
+          projection: projectionAt ? (projectionAt(target.endDate) ?? undefined) : undefined,
         } as typeof decorated[number])
       }
     }
     return decorated
-  }, [data, intraday, range, is24H, target, targetAt])
+  }, [data, intraday, range, is24H, target, targetAt, projectionAt])
 
   const xDomain = useMemo<[number, number] | undefined>(() => {
     if (filteredData.length === 0) return undefined
@@ -233,6 +281,7 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
     for (const d of filteredData) {
       if (d.total != null) totals.push(d.total)
       if ('target' in d && typeof d.target === 'number') totals.push(d.target)
+      if ('projection' in d && typeof d.projection === 'number') totals.push(d.projection)
     }
     const maxVal = totals.length ? Math.max(...totals) : 0
     if (maxVal >= 1_000_000) return (v: number) => `${(v / 1_000_000).toFixed(1)}M`
@@ -256,16 +305,24 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
       label: target?.label ?? '',
       color: 'var(--chart-3)',
     },
-  }) satisfies ChartConfig, [t, target?.label])
+    // Forecast colour intentionally neutral -- the whole chart-* palette is
+    // a single green hue, so a chart-* variant would compete with the target
+    // for "ideal" semantics. Muted-foreground reads as informational/forecast.
+    projection: {
+      label: projection?.label ?? '',
+      color: 'var(--muted-foreground)',
+    },
+  }) satisfies ChartConfig, [t, target?.label, projection?.label])
 
   const labels = useMemo(() => ({
     total: t('dashboard.netWorth'),
     invested: t('dashboard.invested'),
     target: target?.label ?? '',
+    projection: projection?.label ?? '',
     gainLoss: t('dashboard.gainLoss'),
     locale: t('common.locale'),
     currency: t('common.currency'),
-  }), [t, target?.label])
+  }), [t, target?.label, projection?.label])
 
   const xAxisFormatter = useMemo(() => {
     const spanMs = xDomain ? xDomain[1] - xDomain[0] : 0
@@ -278,6 +335,12 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
   // AND the data actually carries an `invested` value -- prevents legend lies.
   const hasInvestedSeries = showInvested && filteredData.some(d => d.invested != null)
   const hasTargetSeries = target != null && filteredData.some(d => 'target' in d && typeof d.target === 'number')
+  const hasProjectionSeries = projection != null && filteredData.some(d => 'projection' in d && typeof d.projection === 'number')
+  // Show the "today" guide only when we actually have future trajectory beyond
+  // the last real data point -- otherwise the guide adds noise without helping
+  // the user separate "past" from "future" visually.
+  const showTodayGuide = todayMs != null && Number.isFinite(todayMs) && (hasTargetSeries || hasProjectionSeries) &&
+    xDomain != null && todayMs >= xDomain[0] && todayMs <= xDomain[1]
 
   return (
     <div>
@@ -291,8 +354,14 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
         <AreaChart data={filteredData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="fillTotal" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--color-total)" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="var(--color-total)" stopOpacity={0.05} />
+            <stop offset="5%" stopColor="var(--color-total)" stopOpacity={0.32} />
+            <stop offset="95%" stopColor="var(--color-total)" stopOpacity={0.04} />
+          </linearGradient>
+          {/* Subtle horizontal fade applied to the projection band so its right
+              edge melts into the chart instead of stopping mid-air. */}
+          <linearGradient id="fillProjection" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="var(--color-projection)" stopOpacity={0.14} />
+            <stop offset="100%" stopColor="var(--color-projection)" stopOpacity={0.02} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -324,6 +393,22 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
           dot={showDots ? { r: 3, fill: 'var(--color-total)', strokeWidth: 0 } : false}
           activeDot={{ r: 4 }}
         />
+        {hasProjectionSeries && (
+          // Render BEFORE target so target sits visually on top. The faint
+          // fill bridges the visual gap between today's data and the deadline,
+          // so the chart doesn't appear to end abruptly.
+          <Area
+            dataKey="projection"
+            type="linear"
+            fill="url(#fillProjection)"
+            stroke="var(--color-projection)"
+            strokeWidth={1.5}
+            strokeDasharray="2 4"
+            dot={false}
+            activeDot={{ r: 3, fill: 'var(--color-projection)', strokeWidth: 0 }}
+            connectNulls
+          />
+        )}
         {hasInvestedSeries && (
           <Line
             dataKey="invested"
@@ -345,6 +430,17 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
             dot={false}
             activeDot={false}
             connectNulls
+          />
+        )}
+        {showTodayGuide && (
+          <ReferenceLine
+            x={todayMs}
+            stroke="var(--muted-foreground)"
+            strokeOpacity={0.35}
+            strokeDasharray="2 4"
+            label={todayLabel
+              ? { value: todayLabel, position: 'insideTopLeft', fill: 'var(--muted-foreground)', fontSize: 10, dy: 4, dx: 4 }
+              : undefined}
           />
         )}
         <Legend content={() => (
@@ -372,6 +468,15 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
                   style={{ borderColor: 'var(--color-target)' }}
                 />
                 <span className="text-muted-foreground">{labels.target}</span>
+              </div>
+            )}
+            {hasProjectionSeries && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <div
+                  className="h-0.5 w-4 border-t-2 border-dotted"
+                  style={{ borderColor: 'var(--color-projection)' }}
+                />
+                <span className="text-muted-foreground">{labels.projection}</span>
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 # Feature: Goals
 
-> Last updated: 2026-05-18 (target trajectory overlay)
+> Last updated: 2026-05-18 (target trajectory + at-current-pace projection)
 
 ## Context
 
@@ -120,7 +120,13 @@ GoalService.setMonthOverride(goalId, yearMonth, amount)
 - **Status badges**: achieved/on track use `variant="default"` (primary), behind uses `variant="destructive"`, waiting uses `variant="secondary"`.
 - **Calendar badges**: "manu." uses `variant="secondary"`, "modif." uses `variant="outline"` — no raw Tailwind color overrides.
 - **Icons**: `TrendingUp`/`TrendingDown` come from `lucide-react` (not HugeIcons) in the goals pages.
-- **Goal detail chart**: `GoalDetailModal` reuses the shared `NetWorthChart` with the optional `target` prop. The chart draws a dashed `var(--chart-3)` line from `(goal.createdAt, 0)` to `(goal.deadline, goal.targetAmount)`, interpolated linearly per visible point. When the `target` prop is set, history is also cropped on the left to `target.startDate` -- pre-goal account activity isn't "savings progress" and would make the chart misleading. On the `ALL` range, the X axis is stretched on the right up to the deadline so the projection beyond today is visible. The `target` prop is opt-in: Dashboard / Accounts / AccountDetail don't pass it and remain unchanged.
+- **Goal detail chart**: `GoalDetailModal` reuses the shared `NetWorthChart` with the optional `target`, `projection`, and `todayMs` props. The chart draws:
+  - A dashed `var(--chart-3)` ideal trajectory from `(goal.createdAt, balanceAtCreation)` to `(goal.deadline, goal.targetAmount)`, where `balanceAtCreation` is the first history point at or after `goal.createdAt`. Using the baseline (not zero) keeps the trajectory in the same reference frame as the live area, so the visual matches the "behind/on track" badge.
+  - A dotted `var(--muted-foreground)` "at current pace" projection from `(today, currentTotal)` to `(goal.deadline, currentTotal + avgMonthlyContribution * monthsLeft)`, rendered as an `Area` with a faint left→right gradient so the chart fades into the future rather than cutting net at today. Skipped when `avgMonthlyContribution` is null (no history yet).
+  - A vertical "today" reference line marking the boundary between past data and future projection. Only drawn when a target/projection extends past the data.
+  - When `target` is set, history is cropped on the left to `target.startDate`. On the `ALL` range, the X axis is stretched right up to the deadline so the projection beyond today is visible.
+  - The goal modal passes `showInvested={false}` to declutter the legend (capital-invested is irrelevant for a savings goal).
+  - The `target`/`projection`/`todayMs` props are opt-in: Dashboard / Accounts / AccountDetail don't pass them and remain unchanged.
 
 ## Links
 
