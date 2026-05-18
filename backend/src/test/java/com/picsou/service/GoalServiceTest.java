@@ -6,6 +6,8 @@ import com.picsou.model.AccountType;
 import com.picsou.model.Goal;
 import com.picsou.repository.AccountRepository;
 import com.picsou.repository.BalanceSnapshotRepository;
+import com.picsou.repository.FamilyMemberRepository;
+import com.picsou.repository.GoalManualContributionRepository;
 import com.picsou.repository.GoalMonthOverrideRepository;
 import com.picsou.repository.GoalRepository;
 import org.junit.jupiter.api.Test;
@@ -29,7 +31,9 @@ class GoalServiceTest {
     @Mock BalanceSnapshotRepository snapshotRepository;
     @Mock AccountService accountService;
     @Mock GoalMonthOverrideRepository overrideRepository;
-    @Mock PriceService priceService;
+    @Mock GoalManualContributionRepository manualContributionRepository;
+    @Mock FamilyMemberRepository familyMemberRepository;
+    @Mock HistoryService historyService;
 
     @InjectMocks GoalService goalService;
 
