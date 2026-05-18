@@ -43,22 +43,30 @@ export function HoldingDetailModal({ line, onClose }: HoldingDetailModalProps) {
 
   const is24H = range === '24H'
 
+  // In "holding" mode we draw a horizontal dashed line at the current cost
+  // basis -- per-ticker history isn't derivable cheaply (no dated lots) so a
+  // static horizontal reference is the honest representation.
+  // In "price" mode "invested" is meaningless (unit price has no cost basis)
+  // and must be omitted so NetWorthChart hides the line + legend.
+  const investedRef = mode === 'holding' && line?.costBasisEur != null ? line.costBasisEur : undefined
+
   const history = useMemo(() => {
     if (!rawHistory) return []
     return rawHistory.map(p => ({
       date: p.date,
       total: mode === 'holding' && line ? p.priceEur * line.quantity : p.priceEur,
+      ...(investedRef !== undefined ? { invested: investedRef } : {}),
     }))
-  }, [rawHistory, mode, line])
+  }, [rawHistory, mode, line, investedRef])
 
   const intraday = useMemo(() => {
     if (!is24H || !rawHistory) return []
     return rawHistory.map(p => ({
       timestamp: p.date,
       total: mode === 'holding' && line ? p.priceEur * line.quantity : p.priceEur,
-      invested: 0,
+      ...(investedRef !== undefined ? { invested: investedRef } : {}),
     }))
-  }, [rawHistory, mode, line, is24H])
+  }, [rawHistory, mode, line, is24H, investedRef])
 
   const priceChange = useMemo(() => {
     if (!rawHistory || rawHistory.length < 2) return null
@@ -157,6 +165,7 @@ export function HoldingDetailModal({ line, onClose }: HoldingDetailModalProps) {
                     intraday={intraday}
                     range={range}
                     onRangeChange={setRange}
+                    showInvested={mode === 'holding'}
                   />
                 ) : is24H ? (
                   <EmptyChartState />
@@ -164,10 +173,25 @@ export function HoldingDetailModal({ line, onClose }: HoldingDetailModalProps) {
               </div>
 
               {/* Stats grid */}
-              <div className="grid grid-cols-4 gap-4 pt-4 border-t">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-4 border-t">
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">{t('holdings.quantity')}</p>
                   <p className="text-sm font-semibold tabular-nums">{line.quantity.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">{t('holdings.capitalInvested')}</p>
+                  {line.costBasisEur != null ? (
+                    <>
+                      <CurrencyDisplay value={line.costBasisEur} className="text-sm font-semibold tabular-nums" />
+                      {line.averageBuyIn != null && (
+                        <p className="text-[10px] text-muted-foreground tabular-nums mt-0.5">
+                          {line.averageBuyIn.toFixed(2)} {t('holdings.perShare')}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold">{'\u2013'}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">{t('holdings.account')}</p>

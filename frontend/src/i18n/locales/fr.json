@@ -214,7 +214,10 @@
     "type": "Type",
     "assetPrice": "Prix du titre",
     "myPosition": "Ma position",
-    "evolution": "Évolution"
+    "evolution": "Évolution",
+    "capitalInvested": "Capital investi",
+    "avgBuyIn": "Prix moyen d'achat",
+    "perShare": "/ part"
   },
   "goals": {
     "title": "Objectifs",

@@ -12,6 +12,9 @@ interface NetWorthChartProps {
   intraday?: IntradayPoint[]
   range: TimeRange
   onRangeChange: (range: TimeRange) => void
+  // Hide the "Capital invested" dashed line + legend entry. When omitted, the
+  // line is shown only if at least one data point carries `invested`.
+  showInvested?: boolean
 }
 
 function NetWorthTooltip({ active, payload, labels, is24H }: {
@@ -112,7 +115,7 @@ function getXAxisFormatter(range: TimeRange, locale: string) {
   }
 }
 
-export function NetWorthChart({ data, intraday = [], range, onRangeChange }: NetWorthChartProps) {
+export function NetWorthChart({ data, intraday = [], range, onRangeChange, showInvested = true }: NetWorthChartProps) {
   const { t } = useTranslation()
   const locale = t('common.locale')
   const is24H = range === '24H'
@@ -169,6 +172,10 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange }: Net
 
   const isEmpty24H = is24H && filteredData.length === 0
 
+  // The dashed "Capital invested" line is only drawn when the caller opts in
+  // AND the data actually carries an `invested` value -- prevents legend lies.
+  const hasInvestedSeries = showInvested && filteredData.some(d => d.invested != null)
+
   return (
     <div>
       <div className="flex justify-end mb-3">
@@ -212,15 +219,17 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange }: Net
           dot={showDots ? { r: 3, fill: 'var(--color-total)', strokeWidth: 0 } : false}
           activeDot={{ r: 4 }}
         />
-        <Line
-          dataKey="invested"
-          type="monotone"
-          stroke="var(--color-invested)"
-          strokeWidth={2}
-          strokeDasharray="6 4"
-          dot={false}
-          activeDot={false}
-        />
+        {hasInvestedSeries && (
+          <Line
+            dataKey="invested"
+            type="monotone"
+            stroke="var(--color-invested)"
+            strokeWidth={2}
+            strokeDasharray="6 4"
+            dot={false}
+            activeDot={false}
+          />
+        )}
         <Legend content={() => (
           <div className="flex items-center justify-center gap-5 pt-2">
             <div className="flex items-center gap-1.5 text-xs">
@@ -230,13 +239,15 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange }: Net
               />
               <span className="text-muted-foreground">{labels.total}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <div
-                className="h-0.5 w-4 border-t-2 border-dashed"
-                style={{ borderColor: 'var(--color-invested)' }}
-              />
-              <span className="text-muted-foreground">{labels.invested}</span>
-            </div>
+            {hasInvestedSeries && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <div
+                  className="h-0.5 w-4 border-t-2 border-dashed"
+                  style={{ borderColor: 'var(--color-invested)' }}
+                />
+                <span className="text-muted-foreground">{labels.invested}</span>
+              </div>
+            )}
           </div>
         )} />
       </AreaChart>

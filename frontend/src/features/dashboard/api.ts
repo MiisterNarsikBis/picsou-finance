@@ -4,7 +4,7 @@ import type { DashboardData } from '@/types/api'
 export interface IntradayPoint {
   timestamp: string
   total: number
-  invested: number
+  invested?: number
 }
 
 export interface PnlData {

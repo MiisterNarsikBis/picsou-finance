@@ -347,29 +347,27 @@ public class TradeRepublicSyncService {
             holdingRepository.deleteByAccountId(account.getId());
             holdingRepository.flush();
             // Deduplicate by ticker: when multiple ISINs convert to the same ticker,
-            // aggregate them to avoid unique constraint violations
-            Map<String, HoldingAgg> deduped = new HashMap<>();
+            // aggregate them via VWAP to avoid unique constraint violations and
+            // preserve a meaningful weighted average buy-in.
+            Map<String, HoldingDedup.HoldingAgg> deduped = new HashMap<>();
             for (TrPosition p : data.positions()) {
                 var result = isinConverter.resolve(p.isin());
                 String ticker = result.ticker();
                 String name = result.name();
-                deduped.merge(ticker, new HoldingAgg(p.quantity(), p.averageBuyIn(), p.currentPrice(), name),
-                    (prev, newPos) -> new HoldingAgg(
-                        prev.quantity.add(newPos.quantity),
-                        prev.averageBuyIn,
-                        prev.currentPrice,
-                        prev.name != null ? prev.name : newPos.name
-                    ));
+                deduped.merge(
+                    ticker,
+                    new HoldingDedup.HoldingAgg(p.quantity(), p.averageBuyIn(), p.currentPrice(), name),
+                    HoldingDedup::vwapMerge);
             }
-            for (Map.Entry<String, HoldingAgg> entry : deduped.entrySet()) {
-                HoldingAgg agg = entry.getValue();
+            for (Map.Entry<String, HoldingDedup.HoldingAgg> entry : deduped.entrySet()) {
+                HoldingDedup.HoldingAgg agg = entry.getValue();
                 holdingRepository.save(AccountHolding.builder()
                     .account(account)
                     .ticker(entry.getKey())
-                    .name(agg.name)
-                    .quantity(agg.quantity)
-                    .averageBuyIn(agg.averageBuyIn)
-                    .currentPrice(agg.currentPrice)
+                    .name(agg.name())
+                    .quantity(agg.quantity())
+                    .averageBuyIn(agg.averageBuyIn())
+                    .currentPrice(agg.currentPrice())
                     .lastSyncedAt(Instant.now())
                     .build());
             }
@@ -393,8 +391,4 @@ public class TradeRepublicSyncService {
     public record AuthInitResponse(String processId) {}
 
     public record SessionStatusResponse(boolean isActive, Instant expiresAt) {}
-
-    // --- Helper records ---
-
-    private record HoldingAgg(BigDecimal quantity, BigDecimal averageBuyIn, BigDecimal currentPrice, String name) {}
 }

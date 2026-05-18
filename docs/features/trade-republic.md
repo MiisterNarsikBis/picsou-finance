@@ -1,6 +1,6 @@
 # Feature: Trade Republic Sync
 
-> Last updated: 2026-04-25
+> Last updated: 2026-05-18
 
 ## Context
 
@@ -39,7 +39,7 @@ Returns a list of `TrAccountData` records: one for securities (type COMPTE_TITRE
 
 ### Holding deduplication
 
-When persisting holdings, multiple ISINs can convert to the same Yahoo Finance ticker symbol (e.g., different listings of the same security). Before inserting into the database, `upsertAccount()` deduplicates holdings by ticker, combining quantities when necessary. This prevents `DataIntegrityViolationException` on the `(account_id, ticker)` unique constraint. See [trade-republic-holding-deduplication.md](./trade-republic-holding-deduplication.md) for implementation details.
+When persisting holdings, multiple ISINs can convert to the same Yahoo Finance ticker symbol (e.g., different listings of the same security). Before inserting into the database, `upsertAccount()` deduplicates holdings by ticker via the shared `HoldingDedup::vwapMerge` helper — quantities are summed and `averageBuyIn` is the quantity-weighted average. This prevents `DataIntegrityViolationException` on the `(account_id, ticker)` unique constraint AND keeps the cost basis mathematically correct. See [trade-republic-holding-deduplication.md](./trade-republic-holding-deduplication.md) for the VWAP formula and gotchas.
 
 ### CSV import fallback
 
@@ -156,7 +156,7 @@ Both compose files (`docker-compose.yml` at repo root and `docker/docker-compose
 - **WebSocket protocol is reverse-engineered**: The TR WebSocket API is undocumented. Raw responses are logged at INFO level. If TR changes the protocol, the adapter will break and need updating.
 - **timeout-driven completion**: The WebSocket session completes when either all data is received (cash + all portfolios + all tickers) or a 30-second timeout is hit.
 - **Multiple sub-portfolios**: The adapter extracts `secAccNo` from the JWT to subscribe to per-account compactPortfolio. If extraction fails, it falls back to a default subscription.
-- **Holding deduplication by ticker**: Multiple ISINs can map to the same ticker. When syncing, holdings are deduplicated in-memory before insertion to avoid unique constraint violations. Quantities are combined, but `averageBuyIn` is kept from the first position—a simplification, but acceptable since duplicates typically represent the same security at different stages.
+- **Holding deduplication by ticker (VWAP)**: Multiple ISINs can map to the same ticker. When syncing, holdings are deduplicated in-memory before insertion to avoid unique constraint violations. Quantities are summed and `averageBuyIn` is the quantity-weighted average (VWAP) via `HoldingDedup::vwapMerge`. The earlier "keep first averageBuyIn" approach was non-deterministic (HashMap iteration order) and produced wrong gain/loss percentages. See [trade-republic-holding-deduplication.md](./trade-republic-holding-deduplication.md).
 - **TrPosition currentPrice fallback**: When a ticker price is missing (ticker subscription timed out or failed), TrPosition.currentPrice is set to averageBuyIn. This allows the sync to complete without blocking on missing real-time data. Portfolio value calculation already uses this fallback logic.
 - **Background sync uses `TransactionTemplate`**: The `completeAuth` background thread runs outside Spring's proxy, so `@Transactional` has no effect. It uses `TransactionTemplate` for programmatic transaction management. If you add more background sync paths, you must wrap them in `txTemplate.executeWithoutResult()` — never rely on class-level `@Transactional` from a non-Spring thread.
 - **`holdingRepository.flush()` is required after delete**: `deleteByAccountId` does not guarantee immediate DB flush. Without an explicit `flush()` call before inserting new holdings, Hibernate may execute INSERT before DELETE, causing duplicate key violations on `(account_id, ticker)`.
@@ -164,8 +164,9 @@ Both compose files (`docker-compose.yml` at repo root and `docker/docker-compose
 
 ## Tests
 
-- `TradeRepublicSyncServiceTest` -- unit tests for auth flow, session refresh, CSV import
-- Manual integration testing against real TR accounts
+- `HoldingDedupTest` -- VWAP math + null handling + order independence (see [trade-republic-holding-deduplication.md](./trade-republic-holding-deduplication.md))
+- `TradeRepublicSyncServiceTest#sync_mergesDuplicateTickersWithVwap` -- wiring test: two ISINs → same ticker → VWAP-merged `averageBuyIn` persisted
+- Manual integration testing against real TR accounts (auth flow, session refresh, CSV import)
 
 ## Links
 

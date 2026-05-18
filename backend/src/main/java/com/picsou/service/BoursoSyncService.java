@@ -246,7 +246,7 @@ public class BoursoSyncService {
             holdingRepository.deleteByAccountId(account.getId());
             holdingRepository.flush();
 
-            Map<String, HoldingAgg> deduped = new HashMap<>();
+            Map<String, HoldingDedup.HoldingAgg> deduped = new HashMap<>();
             for (BoursoPosition p : data.positions()) {
                 String ticker;
                 String name = p.label();
@@ -257,24 +257,21 @@ public class BoursoSyncService {
                 } else {
                     ticker = p.symbol();
                 }
-                deduped.merge(ticker, new HoldingAgg(p.quantity(), p.buyingPrice(), p.currentPrice(), name),
-                    (prev, next) -> new HoldingAgg(
-                        prev.quantity.add(next.quantity),
-                        prev.averageBuyIn,
-                        prev.currentPrice,
-                        prev.name != null ? prev.name : next.name
-                    ));
+                deduped.merge(
+                    ticker,
+                    new HoldingDedup.HoldingAgg(p.quantity(), p.buyingPrice(), p.currentPrice(), name),
+                    HoldingDedup::vwapMerge);
             }
 
-            for (Map.Entry<String, HoldingAgg> entry : deduped.entrySet()) {
-                HoldingAgg agg = entry.getValue();
+            for (Map.Entry<String, HoldingDedup.HoldingAgg> entry : deduped.entrySet()) {
+                HoldingDedup.HoldingAgg agg = entry.getValue();
                 holdingRepository.save(AccountHolding.builder()
                     .account(account)
                     .ticker(entry.getKey())
-                    .name(agg.name)
-                    .quantity(agg.quantity)
-                    .averageBuyIn(agg.averageBuyIn)
-                    .currentPrice(agg.currentPrice)
+                    .name(agg.name())
+                    .quantity(agg.quantity())
+                    .averageBuyIn(agg.averageBuyIn())
+                    .currentPrice(agg.currentPrice())
                     .lastSyncedAt(Instant.now())
                     .build());
             }
@@ -324,6 +321,4 @@ public class BoursoSyncService {
     public record AuthInitResponse(String processId, boolean mfaRequired, String mfaType, String contact) {}
 
     public record SessionStatusResponse(boolean isActive, Instant expiresAt) {}
-
-    private record HoldingAgg(BigDecimal quantity, BigDecimal averageBuyIn, BigDecimal currentPrice, String name) {}
 }

@@ -1,6 +1,6 @@
 # Feature: Live Prices in Holdings
 
-> Last updated: 2026-04-13
+> Last updated: 2026-05-18
 
 ## Context
 
@@ -31,6 +31,21 @@ HoldingsTable renders with live prices
 ```
 
 If the prices API fails (network error, provider down), the hook falls back to the DB prices gracefully.
+
+### Live-price recompute formula (single source of truth)
+
+Both `usePortfolio` (portfolio view across all accounts) and `useHoldingsWithLivePrices` (single account holdings table) share a single helper, `recomputeWithLivePrice`, in `frontend/src/features/accounts/hooks.ts`:
+
+```
+costBasisEur    = quantity * averageBuyIn      (null if averageBuyIn unknown)
+currentValueEur = quantity * livePrice
+pnlEur          = currentValueEur - costBasisEur
+pnlPercent      = pnlEur / costBasisEur * 100  (null if costBasisEur == 0)
+```
+
+All four numbers are derived from the same `livePrice` snapshot, so the header badge (`pnlPercent`), Gain/Loss display (`pnlEur`), and total value (`currentValueEur`) cannot drift out of sync with each other.
+
+The previous implementation in `usePortfolio` updated only `valueEur`/`pnlEur` via delta-add (`l.pnlEur + (newVal - oldVal)`) and left `pnlPercent` at the backend's stored ratio, producing badge-vs-display incoherence on every live-price refresh.
 
 ### Frontend data flow (AccountDetail balance)
 

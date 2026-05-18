@@ -18,12 +18,29 @@ export interface PortfolioLine {
   accountType: Account['type']
   accountColor: string
   valueEur: number
+  costBasisEur: number | null
+  averageBuyIn: number | null
   pnlEur: number | null
   pnlPercent: number | null
   priceUpdatedAt: string | null
 }
 
 const HOLDING_ACCOUNT_TYPES: Account['type'][] = ['PEA', 'COMPTE_TITRES', 'CRYPTO']
+
+// Single source of truth: recompute the (value, cost, pnl, pct) trio from a live price.
+// Keeps all four derived numbers consistent with the same price snapshot.
+function recomputeWithLivePrice(
+  input: { quantity: number; averageBuyIn: number | null },
+  livePrice: number,
+) {
+  const costBasisEur = input.averageBuyIn != null ? input.quantity * input.averageBuyIn : null
+  const currentValueEur = input.quantity * livePrice
+  const pnlEur = costBasisEur != null ? currentValueEur - costBasisEur : null
+  const pnlPercent = costBasisEur != null && costBasisEur !== 0
+    ? (pnlEur! / costBasisEur) * 100
+    : null
+  return { currentValueEur, costBasisEur, pnlEur, pnlPercent }
+}
 
 export function usePortfolio() {
   return useQuery({
@@ -47,6 +64,8 @@ export function usePortfolio() {
               accountType: account.type,
               accountColor: account.color,
               valueEur: h.currentValueEur ?? 0,
+              costBasisEur: h.costBasisEur,
+              averageBuyIn: h.averageBuyIn,
               pnlEur: h.pnlEur,
               pnlPercent: h.pnlPercent,
               priceUpdatedAt: h.priceUpdatedAt,
@@ -72,11 +91,18 @@ export function usePortfolio() {
         if (!l.ticker || l.ticker === 'EUR') return l
         const livePrice = livePrices[l.ticker]
         if (livePrice == null) return l // keep backend priceUpdatedAt
-        const valueEur = l.quantity * livePrice
-        const pnlEur = l.pnlEur != null && l.valueEur > 0
-          ? l.pnlEur + (valueEur - l.valueEur)
-          : null
-        return { ...l, valueEur, pnlEur, priceUpdatedAt: now }
+        const recomputed = recomputeWithLivePrice(
+          { quantity: l.quantity, averageBuyIn: l.averageBuyIn },
+          livePrice,
+        )
+        return {
+          ...l,
+          valueEur: recomputed.currentValueEur,
+          costBasisEur: recomputed.costBasisEur,
+          pnlEur: recomputed.pnlEur,
+          pnlPercent: recomputed.pnlPercent,
+          priceUpdatedAt: now,
+        }
       })
 
       // Cash accounts — aggregate into a single "Euros" line (exclude LOAN accounts)
@@ -91,6 +117,8 @@ export function usePortfolio() {
           accountType: cashAccounts[0].type,
           accountColor: '#22c55e',
           valueEur: cashAccounts.reduce((sum, a) => sum + a.currentBalanceEur, 0),
+          costBasisEur: null,
+          averageBuyIn: null,
           pnlEur: null,
           pnlPercent: null,
           priceUpdatedAt: null,
@@ -143,17 +171,11 @@ export function useHoldingsWithLivePrices(id: number) {
         return holdings.map(h => {
           const livePrice = livePrices[h.ticker]
           if (livePrice == null) return h // keep backend priceUpdatedAt
-          const costBasisEur = h.averageBuyIn != null ? h.quantity * h.averageBuyIn : null
-          const currentValueEur = h.quantity * livePrice
-          const pnlEur = costBasisEur != null ? currentValueEur - costBasisEur : null
-          const pnlPercent = costBasisEur != null && costBasisEur !== 0 ? (pnlEur! / costBasisEur) * 100 : null
+          const recomputed = recomputeWithLivePrice(h, livePrice)
           return {
             ...h,
             currentPrice: livePrice,
-            currentValueEur,
-            costBasisEur,
-            pnlEur,
-            pnlPercent,
+            ...recomputed,
             priceUpdatedAt: now,
           }
         })
