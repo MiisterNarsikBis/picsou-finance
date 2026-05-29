@@ -1,6 +1,8 @@
 package com.picsou.service;
 
+import com.picsou.dto.DebtRequest;
 import com.picsou.dto.HoldingResponse;
+import com.picsou.exception.ResourceNotFoundException;
 import com.picsou.model.Account;
 import com.picsou.model.AccountHolding;
 import com.picsou.model.AccountType;
@@ -21,7 +23,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -92,5 +97,25 @@ class AccountServiceTest {
         assertThat(h.currentValueEur()).isEqualByComparingTo("1000"); // 5 × 200
         assertThat(h.pnlEur()).isEqualByComparingTo("250"); // 1000 − (5 × 150)
         assertThat(h.pnlPercent().doubleValue()).isCloseTo(33.33, within(0.1));
+    }
+
+    @Test
+    void updateDebtMetadata_rejectsLinkedAccount_notOwnedByMember() {
+        // Caller (member 1) owns the loan account (id 1)...
+        when(accountRepository.findByIdAndMemberId(1L, 1L)).thenReturn(Optional.of(ownedAccount()));
+        when(debtRepository.findByAccountId(1L)).thenReturn(Optional.empty());
+        // ...but points linkedAccountId at account 2, which is NOT theirs: the member-scoped
+        // lookup finds nothing. Previously this used an unscoped findById, leaking the foreign
+        // account's name back via DebtResponse (BOLA). It must now be rejected.
+        when(accountRepository.findByIdAndMemberId(2L, 1L)).thenReturn(Optional.empty());
+
+        DebtRequest req = new DebtRequest(
+            2L, new BigDecimal("100000"), new BigDecimal("0.03"), new BigDecimal("500"),
+            "Bank", null, null, null, null);
+
+        assertThatThrownBy(() -> accountService.updateDebtMetadata(1L, 1L, req))
+            .isInstanceOf(ResourceNotFoundException.class);
+        // The cross-member reference must never be persisted.
+        verify(debtRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 }

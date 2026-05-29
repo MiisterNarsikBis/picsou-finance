@@ -338,8 +338,9 @@ public class AccountService {
                 .build());
 
         if (req.linkedAccountId() != null) {
-            Account linked = accountRepository.findById(req.linkedAccountId())
-                .orElseThrow(() -> ResourceNotFoundException.account(req.linkedAccountId()));
+            // Member-scope the linked account like every other lookup in this service —
+            // never resolve a request-supplied account id without the member filter.
+            Account linked = getOrThrow(req.linkedAccountId(), memberId);
             debt.setLinkedAccount(linked);
         } else {
             debt.setLinkedAccount(null);
