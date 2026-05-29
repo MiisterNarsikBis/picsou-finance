@@ -47,6 +47,7 @@ public class AuthController {
     private final MfaService mfaService;
     private final PersistentSessionService persistentSessionService;
     private final SetupAuditService auditService;
+    private final boolean adminRecoveryEnabled;
 
     public AuthController(
         AppUserRepository userRepository,
@@ -57,7 +58,8 @@ public class AuthController {
         AuthCookieWriter cookieWriter,
         MfaService mfaService,
         PersistentSessionService persistentSessionService,
-        SetupAuditService auditService
+        SetupAuditService auditService,
+        @org.springframework.beans.factory.annotation.Value("${app.admin-recovery.enabled:false}") boolean adminRecoveryEnabled
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -68,6 +70,7 @@ public class AuthController {
         this.mfaService = mfaService;
         this.persistentSessionService = persistentSessionService;
         this.auditService = auditService;
+        this.adminRecoveryEnabled = adminRecoveryEnabled;
     }
 
     @PostMapping("/login")
@@ -88,14 +91,29 @@ public class AuthController {
         AppUser user = userRepository.findByUsernameWithMember(req.username())
             .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
 
+        // Break-glass recovery in progress: the admin has been deactivated and a
+        // reset link was printed to the server console. Point the operator there
+        // even if they mistype the (now-irrelevant) old password, and remind them
+        // to turn the flag off so the next restart doesn't deactivate the account
+        // again. The link itself is NOT echoed — only its location — so nothing
+        // secret leaves over HTTP. Returning before the password check also means
+        // the response is identical for right and wrong passwords (no oracle).
+        if (adminRecoveryEnabled && user.getRole() == UserRole.ADMIN && !user.isActivated()) {
+            ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+            problem.setDetail("Admin recovery mode is active: the password reset link was "
+                + "printed to the server console/logs — open it to set a new password. "
+                + "Remember to set ADMIN_RECOVERY_ENABLED=false before the next restart.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem);
+        }
+
         if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw new BadCredentialsException("Invalid credentials");
         }
 
-        // A deactivated account (e.g. pending break-glass admin recovery) must not
-        // get a session: JwtAuthenticationFilter requires isActivated(), so issuing
-        // tokens here would only feed an endless refresh→401 loop. Fail fast with a
-        // clear message that points the user at their activation link.
+        // A deactivated account with the recovery flag off (or a non-admin pending
+        // activation) must not get a session either: JwtAuthenticationFilter
+        // requires isActivated(), so issuing tokens here would only feed an endless
+        // refresh→401 loop. Fail fast with a clear message.
         if (!user.isActivated()) {
             ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
             problem.setDetail("Account not activated. Use your activation link to set a password.");

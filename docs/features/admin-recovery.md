@@ -12,7 +12,12 @@ The operator sets `ADMIN_RECOVERY_ENABLED=true` in the environment and restarts 
 
 The operator opens the URL in a browser and follows the existing `/activate/{token}` flow (the same flow used for inviting new family members) to set a new password. Afterwards, the operator must set `ADMIN_RECOVERY_ENABLED=false` and restart.
 
-While `activated = false`, the account is unusable: **login is rejected with `403` ("Account not activated…")** and **token refresh returns `401`** (the cookies are cleared). The admin's old password technically still matches (recovery does not clear the hash), but login is blocked anyway, so recovery **must** be completed through the activation link — there is no way around it. This consistency is enforced in `AuthController.login` / `AuthController.refresh`, matching the `isActivated()` gate already present in `JwtAuthenticationFilter` and `PersistentTokenAuthFilter`.
+While `activated = false`, the account is unusable: **login is rejected with `403`** and **token refresh returns `401`** (the cookies are cleared). The admin's old password technically still matches (recovery does not clear the hash), but login is blocked anyway, so recovery **must** be completed through the activation link — there is no way around it. This consistency is enforced in `AuthController.login` / `AuthController.refresh`, matching the `isActivated()` gate already present in `JwtAuthenticationFilter` and `PersistentTokenAuthFilter`.
+
+The 403 message depends on whether the recovery flag is still set, so a fumbling operator is told exactly what to do:
+
+- **`ADMIN_RECOVERY_ENABLED=true` + the user is a deactivated `ADMIN`** → "Admin recovery mode is active: the password reset link was printed to the server console/logs — open it to set a new password. Remember to set `ADMIN_RECOVERY_ENABLED=false` before the next restart." This check runs **before** the password comparison, so the operator gets the hint even if they mistype the old password, and the response is identical for right and wrong passwords (no password oracle). The reset link itself is never echoed in the HTTP response — only its location (the console) — so nothing secret leaves over HTTP.
+- **Any other deactivated account** (flag off, or a non-admin pending activation) → the generic "Account not activated. Use your activation link to set a password."
 
 ### Key files
 
@@ -68,10 +73,10 @@ operator: set ADMIN_RECOVERY_ENABLED=false, restart
 
 ## Tests
 
-- Automated: `AuthControllerTest` (Mockito) — login with a deactivated account ⇒ `403` and no cookies set; refresh with a deactivated account (matching `tv`) ⇒ `401` + cookies cleared; the activated happy paths still issue/rotate tokens.
+- Automated: `AuthControllerTest` (Mockito) — login with a deactivated account ⇒ `403` and no cookies set; login while the recovery flag is on ⇒ `403` whose detail points to the console link and the disable-the-flag reminder, before any password check; refresh with a deactivated account (matching `tv`) ⇒ `401` + cookies cleared; the activated happy paths still issue/rotate tokens.
 - Manual:
   1. Set `ADMIN_RECOVERY_ENABLED=true`, boot → expect WARN banner with valid URL.
-  2. Before activating, try to log in with the old password → expect `403` "Account not activated…", no infinite loop.
+  2. Before activating, try to log in with the old password **or a wrong one** → expect `403` pointing to the console reset link and the "set `ADMIN_RECOVERY_ENABLED=false`" reminder; no infinite loop.
   3. Open URL → activation form → set new password → expect "Account activated successfully".
   4. Old session: refresh dashboard → 401 → re-login required.
   5. Set `ADMIN_RECOVERY_ENABLED=false`, boot → expect no banner, no token rotation.

@@ -57,14 +57,19 @@ class AuthControllerTest {
     void setUp() {
         loginBuckets = new HashMap<>();
         mfaVerifyBuckets = new HashMap<>();
-        controller = new AuthController(
-            userRepository, passwordEncoder, jwtUtil,
-            loginBuckets, mfaVerifyBuckets, cookieWriter,
-            mfaService, persistentSessionService, auditService
-        );
+        controller = newController(false);
         httpReq = new MockHttpServletRequest();
         httpReq.setRemoteAddr("10.0.0.5");
         httpRes = new MockHttpServletResponse();
+    }
+
+    private AuthController newController(boolean adminRecoveryEnabled) {
+        return new AuthController(
+            userRepository, passwordEncoder, jwtUtil,
+            loginBuckets, mfaVerifyBuckets, cookieWriter,
+            mfaService, persistentSessionService, auditService,
+            adminRecoveryEnabled
+        );
     }
 
     private AppUser user(boolean activated) {
@@ -97,6 +102,25 @@ class AuthControllerTest {
         // No session must be established for a deactivated account.
         verify(cookieWriter, never()).setAccessAndRefresh(any(), any(), any());
         verify(mfaService, never()).isEnabled(any());
+    }
+
+    @Test
+    void login_returns403_withConsoleHint_whenRecoveryEnabled_evenWithWrongPassword() {
+        AppUser deactivatedAdmin = user(false); // ADMIN, is_activated=false
+        when(userRepository.findByUsernameWithMember("alice")).thenReturn(Optional.of(deactivatedAdmin));
+        AuthController recoveryController = newController(true);
+
+        ResponseEntity<?> res = recoveryController.login(
+            new LoginRequest("alice", "whatever-they-typed", false), httpReq, httpRes);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        ProblemDetail body = (ProblemDetail) res.getBody();
+        assertThat(body.getDetail())
+            .containsIgnoringCase("console")
+            .contains("ADMIN_RECOVERY_ENABLED=false");
+        // Hint fires before (and regardless of) the password check — no oracle, no cookies.
+        verify(passwordEncoder, never()).matches(any(), any());
+        verify(cookieWriter, never()).setAccessAndRefresh(any(), any(), any());
     }
 
     @Test
