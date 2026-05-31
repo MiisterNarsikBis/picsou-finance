@@ -82,13 +82,30 @@ public class FamilyService {
         return FamilyMemberResponse.from(member, user, mfaEnabled);
     }
 
+    /**
+     * Deletes a family member and, by DB cascade, their login and all owned data
+     * (accounts, goals, requisitions, bank sessions, wallets, debts…).
+     *
+     * <p>An activated member is no longer protected — the admin who runs the instance
+     * may remove anyone. Two guards remain to keep the instance usable:
+     * <ul>
+     *   <li>an admin cannot delete their own member (would lock themselves out);</li>
+     *   <li>the last remaining administrator cannot be deleted (no one left to administer).</li>
+     * </ul>
+     *
+     * @param requesterMemberId the member id of the admin performing the deletion
+     */
     @Transactional
-    public void deleteMember(Long id) {
+    public void deleteMember(Long id, Long requesterMemberId) {
         FamilyMember member = memberRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        if (id.equals(requesterMemberId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete your own account");
+        }
         AppUser user = userRepository.findByMemberId(id).orElse(null);
-        if (user != null && user.isActivated()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete a member who has an active account");
+        if (user != null && user.getRole() == UserRole.ADMIN
+            && userRepository.countByRole(UserRole.ADMIN) <= 1) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete the last administrator");
         }
         memberRepository.delete(member);
     }

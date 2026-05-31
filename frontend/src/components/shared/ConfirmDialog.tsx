@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Dialog,
@@ -8,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -19,6 +21,11 @@ interface ConfirmDialogProps {
   onConfirm: () => void
   loading?: boolean
   variant?: 'default' | 'destructive'
+  /**
+   * When set, the confirm button stays disabled until the user retypes this exact
+   * text. Use for irreversible actions (e.g. deleting a member and all their data).
+   */
+  confirmPhrase?: string
 }
 
 export function ConfirmDialog({
@@ -31,8 +38,21 @@ export function ConfirmDialog({
   onConfirm,
   loading,
   variant = 'destructive',
+  confirmPhrase,
 }: ConfirmDialogProps) {
   const { t } = useTranslation()
+  const [typed, setTyped] = useState('')
+  const [wasOpen, setWasOpen] = useState(open)
+
+  // Clear any previous input each time the dialog (re)opens — adjusting state
+  // during render rather than in an effect avoids a cascading-render lint error.
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setTyped('')
+  }
+
+  const phraseRequired = !!confirmPhrase
+  const confirmDisabled = loading || (phraseRequired && typed !== confirmPhrase)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,11 +61,26 @@ export function ConfirmDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
+        {phraseRequired && (
+          <div className="space-y-2">
+            <p className="text-sm">
+              {t('common.confirmTypePrompt', 'Type {{phrase}} to confirm.', {
+                phrase: confirmPhrase,
+              })}
+            </p>
+            <Input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={confirmPhrase}
+              autoFocus
+            />
+          </div>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             {cancelLabel ?? t('common.cancel')}
           </Button>
-          <Button variant={variant} onClick={onConfirm} disabled={loading}>
+          <Button variant={variant} onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel ?? t('common.delete')}
           </Button>
         </DialogFooter>

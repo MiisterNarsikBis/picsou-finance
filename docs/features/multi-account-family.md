@@ -1,6 +1,6 @@
 # Feature: Multi-account family system
 
-> Last updated: 2026-05-29
+> Last updated: 2026-05-31
 
 ## Context
 
@@ -54,7 +54,7 @@ The `FamilyViewService` aggregates shared data for the family dashboard.
 5. `AppUser.isManaged` is set to false, `isActivated` to true
 6. The person can now log in independently
 
-Once activated, a managed member becomes **independent** (`isManaged=true && hasLogin && activated`). The admin can no longer delete their profile or regenerate their activation link. `FamilyService.deleteMember()` enforces this with a 403 guard.
+Once activated, a managed member becomes **independent** (`isManaged=true && hasLogin && activated`). The admin can no longer regenerate their activation link (`generateActivationToken` rejects activated users) or **impersonate** them. The admin **can** still delete an independent member — see "Member deletion" below.
 
 ### Admin access boundary (independent members are private)
 
@@ -92,6 +92,30 @@ users (`FamilyService.generateActivationToken` line 92).
 
 `FamilyMemberResponse` now exposes `loginName` (= `AppUser.username` or `null`)
 so the admin UI can show both the display name and the login side-by-side.
+
+### Member deletion
+
+`DELETE /api/family/members/{id}` (admin-only) removes a member **and, by DB
+cascade, their login (`app_user`) and all owned data** — every owner table's
+`member_id` FK is declared `ON DELETE CASCADE` (see `V20`), so a single
+`memberRepository.delete(member)` wipes accounts, goals, requisitions, bank/crypto
+sessions, wallets, debts, sharing settings and contributions.
+
+An activated (independent) member is **no longer protected** from deletion — the
+admin who runs the instance may remove anyone. `FamilyService.deleteMember(id,
+requesterMemberId)` keeps only two guards so the instance stays usable:
+
+1. **Self-delete** — an admin cannot delete their own member (`id == requesterMemberId`
+   → 403 "Cannot delete your own account"), avoiding a lock-out.
+2. **Last administrator** — if the target's `AppUser.role == ADMIN` and
+   `AppUserRepository.countByRole(ADMIN) <= 1`, deletion is refused (403 "Cannot
+   delete the last administrator").
+
+Frontend: both member-management UIs (`admin/sections/MembersSection.tsx` and
+`settings/FamilySettingsPage.tsx`) show the delete action for any non-self member.
+Because deletion of an **activated** member is irreversible and destroys private
+data, the shared `ConfirmDialog` is given a `confirmPhrase` (the member's display
+name) that the admin must retype before the destructive call is enabled.
 
 ### Username change
 
@@ -164,7 +188,7 @@ Admin clicks managed profile in sidebar dropdown
 - **Stale auth store**: The frontend caches user info (including role) at login time. Changing role in DB requires re-login to take effect in the UI.
 - **Username change requires token rotation**: `PATCH /api/auth/username` must re-issue the JWT cookies. If you only update the DB row, the existing tokens still carry the old username — the filter can't find the user → immediate 401 on next request.
 - **`isIndependent` in frontend must include `managed`**: The display logic for a member's status in `FamilySettingsPage` uses `isIndependent = member.managed && member.hasLogin && member.activated`. Without `managed`, admin users (who are also `hasLogin && activated`) would show "Compte indépendant" instead of "Administrateur".
-- **Cannot delete an activated member**: `FamilyService.deleteMember()` throws 403 if the target member has an activated `AppUser`. The UI hides the delete button for `isIndependent` members, but the backend is the authoritative guard.
+- **Member deletion cascades everything**: `FamilyService.deleteMember(id, requesterMemberId)` deletes the member and, via `ON DELETE CASCADE` on every `member_id` FK, their login and all owned data. Only two 403 guards remain — self-delete and last-admin (see "Member deletion"). Activated members are deletable (the old "cannot delete an activated member" rule was removed). The frontend requires retyping the display name (`ConfirmDialog confirmPhrase`) before deleting an activated member.
 - **Cannot impersonate an activated member**: `UserContext.getMemberIdOverride()` throws 403 when an admin's `?memberId=X` targets an activated (independent) member other than themselves. The sidebar hides them too (`selectSwitchableMembers`), but the backend is the authoritative guard — never rely on the frontend filter alone.
 - **Yahoo Finance null closes**: Yahoo can return `null` in historical price arrays for non-trading days. Must check `close == null` before unboxing to avoid NPE.
 - **Profile switch cache**: TanStack Query cache is global. Without `invalidateQueries()` on switch, the old member's data persists visually.

@@ -15,6 +15,7 @@ import { useGoals } from '@/features/goals/hooks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Plus, Trash2, Link, Shield } from 'lucide-react'
 
 export function FamilySettingsPage() {
@@ -43,6 +44,11 @@ function MemberManagement() {
   const generateLink = useGenerateActivationLink()
   const [newName, setNewName] = useState('')
   const [activationLink, setActivationLink] = useState<string | null>(null)
+  // Independent members own private data; deletion is irreversible, so we require
+  // the admin to retype the display name before the destructive call is enabled.
+  const [memberToDelete, setMemberToDelete] = useState<
+    { id: number; displayName: string; independent: boolean } | null
+  >(null)
 
   if (isLoading) return <div>{t('common.loading')}</div>
 
@@ -112,15 +118,17 @@ function MemberManagement() {
                       {t('family.settings.regenerateLink', 'Regenerate link')}
                     </Button>
                   )}
-                  {!isIndependent && !isOwnProfile && (
+                  {!isOwnProfile && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        if (confirm(t('family.settings.confirmDelete', 'Delete this member and all their data?'))) {
-                          deleteMember.mutate(member.id)
-                        }
-                      }}
+                      onClick={() =>
+                        setMemberToDelete({
+                          id: member.id,
+                          displayName: member.displayName,
+                          independent: isIndependent,
+                        })
+                      }
                     >
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
@@ -165,6 +173,28 @@ function MemberManagement() {
             {t('common.add', 'Add')}
           </Button>
         </div>
+
+        <ConfirmDialog
+          open={memberToDelete !== null}
+          onOpenChange={(open) => { if (!open) setMemberToDelete(null) }}
+          title={t('family.settings.deleteMemberTitle', 'Delete member')}
+          description={t(
+            'family.settings.deleteMemberWarning',
+            'This permanently deletes {{name}}, their login and all of their data (accounts, goals, syncs). This cannot be undone.',
+            { name: memberToDelete?.displayName },
+          )}
+          onConfirm={() => {
+            if (memberToDelete) {
+              deleteMember.mutate(memberToDelete.id, {
+                onSettled: () => setMemberToDelete(null),
+              })
+            }
+          }}
+          loading={deleteMember.isPending}
+          variant="destructive"
+          // Independent members own private data; require retyping their name.
+          confirmPhrase={memberToDelete?.independent ? memberToDelete.displayName : undefined}
+        />
       </CardContent>
     </Card>
   )

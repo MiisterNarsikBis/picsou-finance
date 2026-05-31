@@ -261,6 +261,12 @@ export function MembersSection() {
         onConfirm={handleConfirmDelete}
         loading={deleteMember.isPending}
         variant="destructive"
+        // Activated members own private data; require retyping their name.
+        confirmPhrase={
+          members?.find((m) => m.id === deletingId)?.activated
+            ? members.find((m) => m.id === deletingId)?.displayName
+            : undefined
+        }
       />
 
       <ConfirmDialog

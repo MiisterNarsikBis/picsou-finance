@@ -59,7 +59,7 @@ public class FamilyController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMember(@PathVariable Long id) {
         requireAdmin();
-        familyService.deleteMember(id);
+        familyService.deleteMember(id, userContext.currentMemberId());
     }
 
     @PostMapping("/members/{id}/activate")

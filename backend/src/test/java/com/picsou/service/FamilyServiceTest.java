@@ -2,6 +2,7 @@ package com.picsou.service;
 
 import com.picsou.model.AppUser;
 import com.picsou.model.FamilyMember;
+import com.picsou.model.UserRole;
 import com.picsou.repository.AppUserRepository;
 import com.picsou.repository.FamilyMemberRepository;
 import com.picsou.repository.SharedResourceRepository;
@@ -18,9 +19,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class FamilyServiceTest {
@@ -88,5 +92,67 @@ class FamilyServiceTest {
     @Test
     void deriveUsername_fallsBackToUserWhenNameHasNoAlphanumerics() {
         assertThat(usernameFromActivation("!!!")).isEqualTo("user");
+    }
+
+    // ─── deleteMember ───────────────────────────────────────────────────
+
+    private AppUser appUser(UserRole role) {
+        return AppUser.builder().role(role).activated(true).build();
+    }
+
+    @Test
+    void deleteMember_activatedMember_deletes() {
+        FamilyMember target = member("Bob");
+        when(memberRepository.findById(3L)).thenReturn(Optional.of(target));
+        when(userRepository.findByMemberId(3L)).thenReturn(Optional.of(appUser(UserRole.MEMBER)));
+
+        familyService.deleteMember(3L, 1L);
+
+        verify(memberRepository).delete(target);
+    }
+
+    @Test
+    void deleteMember_self_throwsForbidden() {
+        when(memberRepository.findById(3L)).thenReturn(Optional.of(member("Self")));
+
+        assertThatThrownBy(() -> familyService.deleteMember(3L, 3L))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Cannot delete your own account");
+
+        verify(memberRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteMember_lastAdmin_throwsForbidden() {
+        when(memberRepository.findById(3L)).thenReturn(Optional.of(member("TheAdmin")));
+        when(userRepository.findByMemberId(3L)).thenReturn(Optional.of(appUser(UserRole.ADMIN)));
+        when(userRepository.countByRole(UserRole.ADMIN)).thenReturn(1L);
+
+        assertThatThrownBy(() -> familyService.deleteMember(3L, 1L))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Cannot delete the last administrator");
+
+        verify(memberRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteMember_nonLastAdmin_deletes() {
+        FamilyMember target = member("SecondAdmin");
+        when(memberRepository.findById(3L)).thenReturn(Optional.of(target));
+        when(userRepository.findByMemberId(3L)).thenReturn(Optional.of(appUser(UserRole.ADMIN)));
+        when(userRepository.countByRole(UserRole.ADMIN)).thenReturn(2L);
+
+        familyService.deleteMember(3L, 1L);
+
+        verify(memberRepository).delete(target);
+    }
+
+    @Test
+    void deleteMember_notFound_throws() {
+        when(memberRepository.findById(3L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> familyService.deleteMember(3L, 1L))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("Member not found");
     }
 }
