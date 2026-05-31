@@ -139,6 +139,38 @@ class AuthControllerTest {
         verify(cookieWriter).setAccessAndRefresh(httpRes, "acc", "ref");
     }
 
+    // ─── mfa/verify ──────────────────────────────────────────────────────
+
+    @Test
+    void mfaVerify_returns400_andKeepsChallenge_whenCodeInvalid() {
+        AppUser active = user(true);
+        httpReq.setCookies(new Cookie(AuthCookieWriter.MFA_CHALLENGE_COOKIE, "challenge"));
+        Claims claims = org.mockito.Mockito.mock(Claims.class);
+        when(jwtUtil.validateAndParse("challenge")).thenReturn(claims);
+        when(jwtUtil.isMfaChallengeToken(claims)).thenReturn(true);
+        when(claims.get("uid", Long.class)).thenReturn(7L);
+        when(userRepository.findByIdWithMember(7L)).thenReturn(Optional.of(active));
+        when(mfaService.verifyTotpOrRecovery(active, "000000", false)).thenReturn(false);
+
+        ResponseEntity<?> res = controller.mfaVerify(
+            new com.picsou.dto.MfaDtos.MfaVerifyRequest("000000", false, false), httpReq, httpRes);
+
+        // 400, not 401: the challenge is still valid, only the code is wrong. The
+        // frontend keeps the user on the page to retry instead of bouncing to /login.
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(cookieWriter, never()).clearMfaChallenge(httpRes);
+        verify(cookieWriter, never()).setAccessAndRefresh(any(), any(), any());
+    }
+
+    @Test
+    void mfaVerify_returns401_whenNoChallengeCookie() {
+        ResponseEntity<?> res = controller.mfaVerify(
+            new com.picsou.dto.MfaDtos.MfaVerifyRequest("123456", false, false), httpReq, httpRes);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(mfaService, never()).verifyTotpOrRecovery(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
     // ─── refresh ─────────────────────────────────────────────────────────
 
     @Test

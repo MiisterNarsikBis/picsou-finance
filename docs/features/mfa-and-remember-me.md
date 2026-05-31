@@ -83,7 +83,8 @@ AppUser (id, username, password_hash, role, member_id, ...)
                              │ POST /api/auth/mfa/verify (code, trustDevice?)
                              ▼
                   TOTP or recovery code valid?
-                   ├── no ──► 401 (rate-limited per uid)
+                   ├── no ──► 400 Invalid verification code
+                   │          (challenge cookie kept — retry in place)
                    └── yes
                              │ clear mfa_challenge
                              │ access+refresh cookies set

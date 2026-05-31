@@ -183,8 +183,12 @@ public class AuthController {
 
         boolean isRecovery = Boolean.TRUE.equals(req.isRecoveryCode());
         if (!mfaService.verifyTotpOrRecovery(user, req.code(), isRecovery)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid verification code"));
+            // 400, not 401: the challenge cookie is still valid — only the code is
+            // wrong. The frontend treats 401 as "challenge gone, re-login" and
+            // bounces to /login; a bad code must keep the user on the page to retry.
+            // The challenge cookie is intentionally left intact here.
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid verification code"));
         }
 
         boolean rememberMe = jwtUtil.getRememberMeClaim(claims);
