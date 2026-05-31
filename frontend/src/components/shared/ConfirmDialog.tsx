@@ -26,6 +26,12 @@ interface ConfirmDialogProps {
    * text. Use for irreversible actions (e.g. deleting a member and all their data).
    */
   confirmPhrase?: string
+  /**
+   * A friendly, already-formatted error message to show inside the dialog (the
+   * dialog stays open so the user can read it and retry). Pass the result of
+   * {@link formatApiError}; the parent owns clearing it on close/success.
+   */
+  error?: string
 }
 
 export function ConfirmDialog({
@@ -39,6 +45,7 @@ export function ConfirmDialog({
   loading,
   variant = 'destructive',
   confirmPhrase,
+  error,
 }: ConfirmDialogProps) {
   const { t } = useTranslation()
   const [typed, setTyped] = useState('')
@@ -75,6 +82,14 @@ export function ConfirmDialog({
               autoFocus
             />
           </div>
+        )}
+        {error && (
+          <p
+            role="alert"
+            className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </p>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>

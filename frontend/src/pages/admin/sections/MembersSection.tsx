@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { formatApiError } from '@/lib/errors'
 import { useAuthStore } from '@/stores/auth-store'
 import {
   useFamilyMembers,
@@ -255,11 +256,12 @@ export function MembersSection() {
 
       <ConfirmDialog
         open={deletingId !== null}
-        onOpenChange={(o) => { if (!o) setDeletingId(null) }}
+        onOpenChange={(o) => { if (!o) { setDeletingId(null); deleteMember.reset() } }}
         title={t('admin.members.deleteConfirmTitle')}
         description={t('admin.members.deleteConfirmDesc')}
         onConfirm={handleConfirmDelete}
         loading={deleteMember.isPending}
+        error={deleteMember.isError ? formatApiError(deleteMember.error, t) : undefined}
         variant="destructive"
         // Activated members own private data; require retyping their name.
         confirmPhrase={

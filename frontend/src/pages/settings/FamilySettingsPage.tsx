@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { formatApiError } from '@/lib/errors'
 import { Plus, Trash2, Link, Shield } from 'lucide-react'
 
 export function FamilySettingsPage() {
@@ -176,7 +177,7 @@ function MemberManagement() {
 
         <ConfirmDialog
           open={memberToDelete !== null}
-          onOpenChange={(open) => { if (!open) setMemberToDelete(null) }}
+          onOpenChange={(open) => { if (!open) { setMemberToDelete(null); deleteMember.reset() } }}
           title={t('family.settings.deleteMemberTitle', 'Delete member')}
           description={t(
             'family.settings.deleteMemberWarning',
@@ -185,12 +186,14 @@ function MemberManagement() {
           )}
           onConfirm={() => {
             if (memberToDelete) {
+              // Close only on success — on error the dialog stays open and shows why.
               deleteMember.mutate(memberToDelete.id, {
-                onSettled: () => setMemberToDelete(null),
+                onSuccess: () => setMemberToDelete(null),
               })
             }
           }}
           loading={deleteMember.isPending}
+          error={deleteMember.isError ? formatApiError(deleteMember.error, t) : undefined}
           variant="destructive"
           // Independent members own private data; require retyping their name.
           confirmPhrase={memberToDelete?.independent ? memberToDelete.displayName : undefined}
