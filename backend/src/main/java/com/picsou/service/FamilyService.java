@@ -83,7 +83,7 @@ public class FamilyService {
     }
 
     /**
-     * Deletes a family member and, by DB cascade, their login and all owned data
+     * Deletes a family member together with their login and all owned data
      * (accounts, goals, requisitions, bank sessions, wallets, debts…).
      *
      * <p>An activated member is no longer protected — the admin who runs the instance
@@ -92,6 +92,14 @@ public class FamilyService {
      *   <li>an admin cannot delete their own member (would lock themselves out);</li>
      *   <li>the last remaining administrator cannot be deleted (no one left to administer).</li>
      * </ul>
+     *
+     * <p><b>Deletion order matters.</b> The member's {@link AppUser} is loaded into the
+     * persistence context above (for the last-admin guard). {@code AppUser.member} is a
+     * non-nullable {@code @OneToOne}, so deleting the member while that managed user still
+     * references it makes Hibernate throw {@code TransientObjectException} at flush —
+     * before any SQL runs, so the DB {@code ON DELETE CASCADE} never gets a chance. We
+     * therefore delete the loaded {@code AppUser} first; the member delete then cascades
+     * the remaining (unloaded) owned rows at the database level.
      *
      * @param requesterMemberId the member id of the admin performing the deletion
      */
@@ -106,6 +114,11 @@ public class FamilyService {
         if (user != null && user.getRole() == UserRole.ADMIN
             && userRepository.countByRole(UserRole.ADMIN) <= 1) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete the last administrator");
+        }
+        if (user != null) {
+            // Remove the only managed entity referencing the member before deleting it,
+            // otherwise Hibernate fails the flush with TransientObjectException.
+            userRepository.delete(user);
         }
         memberRepository.delete(member);
     }
@@ -136,7 +149,7 @@ public class FamilyService {
 
         AppUser existingUser = userRepository.findByMemberId(memberId).orElse(null);
         if (existingUser != null && existingUser.isActivated()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member already has active login");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This account already has an active login.");
         }
 
         byte[] tokenBytes = new byte[32];

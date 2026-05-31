@@ -11,6 +11,7 @@ import com.picsou.repository.UserMfaRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -154,5 +156,37 @@ class FamilyServiceTest {
         assertThatThrownBy(() -> familyService.deleteMember(3L, 1L))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("Member not found");
+    }
+
+    /**
+     * Guards the regression that returned 500: when the target has a login, the
+     * {@link AppUser} (loaded for the last-admin guard) must be deleted BEFORE the
+     * member. Deleting the member first leaves a managed user pointing at a removed,
+     * non-nullable {@code @OneToOne} → Hibernate throws TransientObjectException at flush.
+     */
+    @Test
+    void deleteMember_withLogin_deletesUserBeforeMember() {
+        FamilyMember target = member("Bob");
+        AppUser user = appUser(UserRole.MEMBER);
+        when(memberRepository.findById(3L)).thenReturn(Optional.of(target));
+        when(userRepository.findByMemberId(3L)).thenReturn(Optional.of(user));
+
+        familyService.deleteMember(3L, 1L);
+
+        InOrder order = inOrder(userRepository, memberRepository);
+        order.verify(userRepository).delete(user);
+        order.verify(memberRepository).delete(target);
+    }
+
+    @Test
+    void deleteMember_managedWithoutLogin_deletesOnlyMember() {
+        FamilyMember target = member("Child");
+        when(memberRepository.findById(3L)).thenReturn(Optional.of(target));
+        when(userRepository.findByMemberId(3L)).thenReturn(Optional.empty());
+
+        familyService.deleteMember(3L, 1L);
+
+        verify(userRepository, never()).delete(any());
+        verify(memberRepository).delete(target);
     }
 }

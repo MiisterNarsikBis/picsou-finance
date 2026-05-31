@@ -96,10 +96,44 @@ so the admin UI can show both the display name and the login side-by-side.
 ### Member deletion
 
 `DELETE /api/family/members/{id}` (admin-only) removes a member **and, by DB
-cascade, their login (`app_user`) and all owned data** — every owner table's
-`member_id` FK is declared `ON DELETE CASCADE` (see `V20`), so a single
-`memberRepository.delete(member)` wipes accounts, goals, requisitions, bank/crypto
-sessions, wallets, debts, sharing settings and contributions.
+cascade, all owned data** — every owner table's `member_id` FK is declared
+`ON DELETE CASCADE` (see `V20`), so deleting the member wipes accounts, goals,
+requisitions, bank/crypto sessions, wallets, debts, sharing settings and
+contributions.
+
+**Deletion order matters (JPA flush ordering).** `FamilyService.deleteMember`
+loads the target's `AppUser` into the persistence context to run the last-admin
+guard. `AppUser.member` is a **non-nullable** `@OneToOne` on `member_id`, so if we
+deleted the member while that *managed* `AppUser` still referenced it, Hibernate
+would throw `TransientObjectException` **at flush — before any SQL runs**, so the
+DB `ON DELETE CASCADE` never gets a chance. The method therefore deletes the loaded
+`AppUser` explicitly first, *then* the member:
+
+```java
+AppUser user = userRepository.findByMemberId(id).orElse(null);
+// ... guards ...
+if (user != null) userRepository.delete(user);  // the only managed entity referencing the member
+memberRepository.delete(member);                // DB ON DELETE CASCADE wipes the rest
+```
+
+Other owned rows (accounts, goals, sessions…) stay **unloaded** in this transaction,
+so no managed entity references the removed member at flush and the DB cascade
+handles them.
+
+**Regression coverage (and why it's not a flush test).** The ideal guard would
+persist a member + linked `AppUser`, flush, and assert `deleteMember` succeeds —
+reproducing `TransientObjectException` on the pre-fix code. That isn't feasible
+here: the schema is PostgreSQL-specific (`TIMESTAMPTZ`, native enum types, Flyway
+`ON DELETE CASCADE`) and does not replay on the H2 in-memory database used for
+tests, and the project deliberately avoids Testcontainers (see
+`docs/conventions/testing.md`) — every test is a Mockito unit test. The regression
+is therefore guarded by `FamilyServiceTest.deleteMember_withLogin_deletesUserBeforeMember`,
+which uses Mockito `InOrder` to assert `userRepository.delete(user)` is invoked
+**before** `memberRepository.delete(member)`. It cannot reproduce the flush
+exception (no live `flush()`), but it locks the fix: it fails the instant the two
+deletes are reordered back to the buggy sequence.
+`deleteMember_managedWithoutLogin_deletesOnlyMember` covers the no-login branch
+(only the member is deleted, no `AppUser`).
 
 An activated (independent) member is **no longer protected** from deletion — the
 admin who runs the instance may remove anyone. `FamilyService.deleteMember(id,
@@ -188,7 +222,7 @@ Admin clicks managed profile in sidebar dropdown
 - **Stale auth store**: The frontend caches user info (including role) at login time. Changing role in DB requires re-login to take effect in the UI.
 - **Username change requires token rotation**: `PATCH /api/auth/username` must re-issue the JWT cookies. If you only update the DB row, the existing tokens still carry the old username — the filter can't find the user → immediate 401 on next request.
 - **`isIndependent` in frontend must include `managed`**: The display logic for a member's status in `FamilySettingsPage` uses `isIndependent = member.managed && member.hasLogin && member.activated`. Without `managed`, admin users (who are also `hasLogin && activated`) would show "Compte indépendant" instead of "Administrateur".
-- **Member deletion cascades everything**: `FamilyService.deleteMember(id, requesterMemberId)` deletes the member and, via `ON DELETE CASCADE` on every `member_id` FK, their login and all owned data. Only two 403 guards remain — self-delete and last-admin (see "Member deletion"). Activated members are deletable (the old "cannot delete an activated member" rule was removed). The frontend requires retyping the display name (`ConfirmDialog confirmPhrase`) before deleting an activated member.
+- **Member deletion cascades everything — but order matters**: `FamilyService.deleteMember(id, requesterMemberId)` must delete the loaded `AppUser` **before** the member. `AppUser.member` is a non-nullable `@OneToOne`; deleting the member while a managed `AppUser` still references it makes Hibernate throw `TransientObjectException` at flush (before any SQL), so the DB `ON DELETE CASCADE` never runs. After the `AppUser` is removed, `memberRepository.delete(member)` cascades the rest (accounts, goals, sessions…) at the DB level. A Mockito `InOrder` test (`FamilyServiceTest.deleteMember_withLogin_deletesUserBeforeMember`) locks the ordering; a true flush test isn't possible because the PG-specific schema (`TIMESTAMPTZ`, native enums) won't replay on H2 (see "Member deletion" and `docs/conventions/testing.md`). Only two 403 guards remain — self-delete and last-admin (see "Member deletion"). Activated members are deletable (the old "cannot delete an activated member" rule was removed). The frontend requires retyping the display name (`ConfirmDialog confirmPhrase`) before deleting an activated member, and surfaces any backend error inside the dialog via `formatApiError` (see `docs/conventions/error-handling.md`).
 - **Cannot impersonate an activated member**: `UserContext.getMemberIdOverride()` throws 403 when an admin's `?memberId=X` targets an activated (independent) member other than themselves. The sidebar hides them too (`selectSwitchableMembers`), but the backend is the authoritative guard — never rely on the frontend filter alone.
 - **Yahoo Finance null closes**: Yahoo can return `null` in historical price arrays for non-trading days. Must check `close == null` before unboxing to avoid NPE.
 - **Profile switch cache**: TanStack Query cache is global. Without `invalidateQueries()` on switch, the old member's data persists visually.
@@ -196,6 +230,12 @@ Admin clicks managed profile in sidebar dropdown
 ## Tests
 
 - `GoalServiceTest` — goal CRUD scoped by memberId
+- `FamilyServiceTest` — username derivation, activation/reset, and **member deletion**:
+  `deleteMember_withLogin_deletesUserBeforeMember` (Mockito `InOrder` guard for the
+  `TransientObjectException` fix), `deleteMember_managedWithoutLogin_deletesOnlyMember`,
+  `deleteMember_self_throwsForbidden`, `deleteMember_lastAdmin_throwsForbidden`,
+  `deleteMember_nonLastAdmin_deletes`, `deleteMember_activatedMember_deletes`,
+  `deleteMember_notFound_throws`
 
 ## Links
 
