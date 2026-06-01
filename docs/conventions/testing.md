@@ -6,9 +6,12 @@ There is **no** `unit/` or `integration/` directory split. All tests live flat u
 
 ```
 src/test/java/com/picsou/
-├── service/
-│   └── GoalServiceTest.java
-└── ...
+├── service/      # 19 service test classes (GoalService, AccountService, FamilyService,
+│                 #   MfaService, SecurityInsightService, HoldingCompute, …)
+├── adapter/      # external-provider adapter tests
+├── controller/   # MockMvc controller tests
+├── config/       # security / config tests
+└── export/       # GDPR export tests
 ```
 
 ## Unit tests
@@ -69,7 +72,7 @@ When JPA is needed, use `@DataJpaTest` with **H2 in-memory** (not Testcontainers
 
 ```bash
 # H2 auto-configures; no external database needed
-./mvnw test -Dtest=SomeRepoTest
+mvn test -Dtest=SomeRepoTest
 ```
 
 H2 is on the test classpath via `spring-boot-starter-test`. No Testcontainers dependency exists in the project.
@@ -80,7 +83,7 @@ H2 is on the test classpath via `spring-boot-starter-test`. No Testcontainers de
 - **E2E tests:** Playwright (`@playwright/test`).
 - Run commands:
   ```bash
-  npx vitest run          # unit tests
+  bunx vitest run         # unit tests
   bun run test:e2e        # E2E tests
   ```
 
@@ -88,18 +91,18 @@ H2 is on the test classpath via `spring-boot-starter-test`. No Testcontainers de
 
 ```bash
 # Backend — all tests
-./mvnw test
+mvn test
 
 # Backend — single test class
-./mvnw test -Dtest=GoalServiceTest
+mvn test -Dtest=GoalServiceTest
 
 # Backend — single test method
-./mvnw test -Dtest=GoalServiceTest#progressCalculation_onTrack
+mvn test -Dtest=GoalServiceTest#progressCalculation_onTrack
 ```
 
 ## Current coverage
 
-Only `GoalServiceTest` exists currently. As the codebase grows, prioritize:
+The suite has **247 backend tests** across 35 test classes (service, adapter, controller, config, export). Service-layer unit tests dominate. When adding coverage, prioritize:
 
 1. **Service-layer unit tests** — mock dependencies, test business logic.
 2. **Repository custom queries** — `@DataJpaTest` for non-trivial JPQL.

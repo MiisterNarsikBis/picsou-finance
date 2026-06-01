@@ -42,18 +42,18 @@
 
 | Feature | Last updated | Note |
 |---------|-------------|------|
-| Frontend utilities (lib/utils.ts) | 2026-04-13 | [frontend-utils.md](./features/frontend-utils.md) |
+| Frontend utilities (lib/utils.ts) | 2026-05-31 | [frontend-utils.md](./features/frontend-utils.md) |
 | Demo mode | 2026-04-08 | [demo-mode.md](./features/demo-mode.md) |
 | Theme (dark / light / system) | 2026-04-08 | [theme-persistence.md](./features/theme-persistence.md) |
 | Dashboard — Time range isolation | 2026-04-13 | [dashboard-time-range-isolation.md](./features/dashboard-time-range-isolation.md) |
-| Bank sync | 2026-04-25 | [bank-sync.md](./features/bank-sync.md) |
-| Trade Republic | 2026-04-25 | [trade-republic.md](./features/trade-republic.md) |
-| Trade Republic — Holdings deduplication | 2026-04-05 | [trade-republic-holding-deduplication.md](./features/trade-republic-holding-deduplication.md) |
+| Bank sync | 2026-05-03 | [bank-sync.md](./features/bank-sync.md) |
+| Trade Republic | 2026-05-18 | [trade-republic.md](./features/trade-republic.md) |
+| Trade Republic — Holdings deduplication | 2026-05-18 | [trade-republic-holding-deduplication.md](./features/trade-republic-holding-deduplication.md) |
 | ISIN → Ticker conversion | 2026-04-13 | [ISIN_TO_TICKER_CONVERSION.md](./features/ISIN_TO_TICKER_CONVERSION.md) |
 | Encryption at rest | 2026-04-08 | [encryption-at-rest.md](./features/encryption-at-rest.md) |
 | Crypto tracking | 2026-04-08 | [crypto-tracking.md](./features/crypto-tracking.md) |
-| Savings goals | 2026-04-13 | [goals.md](./features/goals.md) |
-| Goals — Grid view (donuts) | 2026-04-08 | [goal-calendar-donut.md](./features/goal-calendar-donut.md) |
+| Savings goals | 2026-05-29 | [goals.md](./features/goals.md) |
+| Goals — Grid view (donuts) | 2026-05-29 | [goal-calendar-donut.md](./features/goal-calendar-donut.md) |
 | Price service | 2026-05-19 | [price-service.md](./features/price-service.md) |
 | Live prices (holdings) | 2026-05-19 | [live-prices-holdings.md](./features/live-prices-holdings.md) |
 | Security Insight (asset type + ETF composition) | 2026-06-02 | [security-insight.md](./features/security-insight.md) |
@@ -62,16 +62,17 @@
 | BoursoBank sync ⏸ disabled in 1.0.0 | 2026-04-26 | [bourso-bank.md](./features/bourso-bank.md) |
 | Accounts overview (PnL chart + summary card + filters) | 2026-04-13 | [accounts-overview.md](./features/accounts-overview.md) |
 | Add Account modal (unified sync + manual) | 2026-04-25 | [add-account-modal.md](./features/add-account-modal.md) |
-| Docker deployment | 2026-04-25 | [docker-deployment.md](./features/docker-deployment.md) |
+| Docker deployment | 2026-05-18 | [docker-deployment.md](./features/docker-deployment.md) |
 | Navigation (sidebar + mobile bottom nav) | 2026-04-13 | [sidebar-navigation.md](./features/sidebar-navigation.md) |
-| Multi-account family system | 2026-04-26 | [multi-account-family.md](./features/multi-account-family.md) |
+| Multi-account family system | 2026-05-31 | [multi-account-family.md](./features/multi-account-family.md) |
 | CORS & cookie security | 2026-04-22 | [security-cors-cookies.md](./features/security-cors-cookies.md) |
 | 24H Intraday net worth chart | 2026-04-18 | [intraday-chart.md](./features/intraday-chart.md) |
 | First-launch Setup Wizard | 2026-04-24 | [setup-wizard.md](./features/setup-wizard.md) |
-| Admin page (instance settings) | 2026-04-26 | [admin-page.md](./features/admin-page.md) |
-| Frontend error display (`extractErrorMessage`) | 2026-04-25 | [frontend-error-display.md](./features/frontend-error-display.md) |
+| Admin page (instance settings) | 2026-05-29 | [admin-page.md](./features/admin-page.md) |
+| Admin recovery (lost-admin console reset) | 2026-05-29 | [admin-recovery.md](./features/admin-recovery.md) |
+| Frontend error display (`extractErrorMessage`) | 2026-05-31 | [frontend-error-display.md](./features/frontend-error-display.md) |
 | Loan accounts (LOAN type, amortization view) | 2026-04-26 | [loans.md](./features/loans.md) |
-| 2FA (TOTP) and Remember Me | 2026-04-26 | [mfa-and-remember-me.md](./features/mfa-and-remember-me.md) |
+| 2FA (TOTP) and Remember Me | 2026-06-01 | [mfa-and-remember-me.md](./features/mfa-and-remember-me.md) |
 | GDPR data export (JSON + CSV) | 2026-04-26 | [data-export.md](./features/data-export.md) |
 
 ## Conventions

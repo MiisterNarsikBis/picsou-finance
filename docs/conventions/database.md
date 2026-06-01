@@ -31,7 +31,7 @@ V{n}__description.sql
 - Double underscore before the description.
 - Description in snake_case.
 
-### Existing migrations (V1-V13)
+### Existing migrations (V1-V32)
 
 | File | Content |
 |------|---------|
@@ -47,8 +47,27 @@ V{n}__description.sql
 | `V11__account_holding.sql` | `account_holding` table |
 | `V12__transactions.sql` | `transaction` table |
 | `V13__goal_manual_contribution.sql` | `goal_manual_contribution` table |
+| `V14__price_snapshot.sql` | `price_snapshot` table (price cache history) |
+| `V15__widen_encrypted_columns.sql` | Widen encrypted secret columns for AES-GCM payloads |
+| `V16__finary_session.sql` | `finary_session` table |
+| `V17__requisition_last_synced_at.sql` | `last_synced_at` column on `requisition` |
+| `V18__snapshot_invested_amount.sql` | `invested_amount` column on `balance_snapshot` |
+| `V19__real_estate_and_debts.sql` | Real-estate accounts + `debt` linkage |
+| `V20__create_family_system.sql` | `family_member`, `sharing_settings`, `shared_resource` |
+| `V21__migrate_existing_data.sql` | Backfill `member_id` on all existing financial rows |
+| `V22__make_member_id_not_null.sql` | Enforce `member_id NOT NULL` after backfill |
+| `V23__bourso_session.sql` | `bourso_session` table (BoursoBank sidecar) |
+| `V24__manual_transactions.sql` | Manual transaction support |
+| `V25__setup_state.sql` | First-launch Setup Wizard state |
+| `V26__setup_audit.sql` | Setup audit log |
+| `V27__loan_extra_fields.sql` | Loan amortization fields on `account` |
+| `V28__mfa_and_persistent_sessions.sql` | TOTP 2FA + rotating Remember-Me tokens |
+| `V29__app_user_token_version.sql` | `token_version` claim column for stateless invalidation |
+| `V30__account_soft_delete.sql` | Soft-delete (`deleted_at`) on `account` |
+| `V31__price_cleanup_gate.sql` | Gate column controlling price-snapshot cleanup |
+| `V32__goal_history_start.sql` | `history_start` column anchoring goal trajectory charts |
 
-Note: V8 is absent (likely rolled into another migration or skipped).
+Note: V8 is absent by design (skipped — never rolled into another migration).
 
 ### Writing a new migration
 
