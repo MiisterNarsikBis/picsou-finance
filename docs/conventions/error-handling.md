@@ -116,7 +116,11 @@ Don't:
 
 Status-to-message mapping (as in `TradeRepublicTab.formatAuthError` and
 `BoursoTab.formatError`) must happen **before** the helper — only the unmapped tail
-should fall through. Pages that need a domain-specific default pass it as the
+should fall through. Those formatters read the status/detail through the typed
+`unknown`-safe accessors `getErrorStatus(err): number | undefined` and
+`getErrorDetail(err): string | undefined` (same file) — never an inline
+`(err as any).response?.status` cast. These two helpers centralise the single
+`as { response?: … }` cast so call sites stay `unknown`-typed and lint-clean. Pages that need a domain-specific default pass it as the
 `fallback` argument (e.g. `t('sync.tr.errors.unknownError')`).
 
 ### `formatApiError(err, t, fallbackKey?)` — the default for most call sites

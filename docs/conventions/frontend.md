@@ -70,6 +70,51 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 Auth cookies are HttpOnly — the Zustand store is the JS-readable signal, persisted in `sessionStorage`.
 
+## Hooks and React Compiler rules
+
+`eslint-plugin-react-hooks` v7 ships the **React Compiler** lint rules (`purity`,
+`set-state-in-effect`, `set-state-in-render`, `immutability`, `refs`,
+`incompatible-library`) on top of the classic `exhaustive-deps`. `bun run lint` is
+expected to be **zero-warning** — these are errors, not suggestions. The canonical
+fixes below are already applied across the codebase; match them when you hit a rule.
+
+| Rule | What trips it | Canonical fix |
+|------|---------------|---------------|
+| `purity` | `Math.random()` / `Date.now()` / `new Date()` read during render | Lazy `useState(() => …)` initializer — runs once at mount, value stays stable. Never `useMemo` for impure once-at-mount values (`useMemo` may re-run). |
+| `set-state-in-render` | `setState()` inside a `useMemo`/render body | Compute the value and return it: `const x = useMemo(() => ({…}), deps)`. Drop the paired `useState`/`setState`. |
+| `immutability` | Mutating a binding during render (`let total = 0; total += …` in JSX) | `reduce` / `useMemo` that *returns* the derived value. |
+| `set-state-in-effect` | Synchronous `setState()` in an effect body — populate/reset-on-open effects | **Key-remount pattern** (below). For a genuine fetch-on-mount that syncs an external system, a *documented* `// eslint-disable-next-line react-hooks/set-state-in-effect` is acceptable (see `ConnectionGuard.tsx`). |
+| `incompatible-library` | react-hook-form `watch('x')` | `useWatch({ control, name: 'x' })`. |
+| `exhaustive-deps` | TanStack mutation in a dep array — `[health.mutate]` makes the rule demand the whole (unstable) mutation object | Destructure the stable fn into a local: `const { mutate: probeHealth } = useXHealth()`, depend on `probeHealth`. Keep the object binding if you also read `.isPending` in render. |
+
+### Key-remount instead of populate/reset-on-open effects
+
+Modals that used to seed/reset form state via `useEffect(…, [open])` now mount a child
+form only while open, keyed so it remounts per edited entity. Initial state comes from
+props through **lazy `useState` initializers** — no effect, no `set-state-in-effect`:
+
+```tsx
+// Parent: mount the form only while open, remount per entity
+{open && entity && <EntityForm key={entity.id} entity={entity} … />}
+
+// Child: seed every field from props via lazy initializers
+function EntityForm({ entity }) {
+  const [qty, setQty] = useState(() => String(entity.quantity))
+  // …handlers do the work; no useEffect
+}
+```
+
+Applied in `AddTransactionModal`, `EditHoldingModal`, `MonthEndBalanceModal`. Auto-fill
+that previously lived in an effect (e.g. ticker → holding name) moves into the change
+handler so it stays out of render.
+
+### shadcn `ui/` and `react-refresh/only-export-components`
+
+shadcn components dual-export a component plus its `*Variants` cva object, which trips
+`react-refresh/only-export-components`. These files are **vendor-generated** (a future
+`shadcn add` overwrites them), so the rule is scoped **off** for `src/components/ui/**`
+in `eslint.config.js` rather than hand-edited. Do not add disables inside those files.
+
 ## API client
 
 Single Axios instance in `lib/api-client.ts`:
@@ -174,9 +219,13 @@ bun run build        # tsc + vite build (fails on type errors)
 bun run typecheck    # TypeScript checking only
 bun run lint         # ESLint
 bun run format       # Prettier
-bun run test:e2e     # Playwright E2E tests
-npx vitest run       # Vitest unit tests
+bun run test:e2e     # Playwright E2E tests (e2e/*.spec.ts)
+bunx vitest run      # Vitest unit tests (src/**/*.{test,spec}.{ts,tsx})
 ```
+
+Vitest and Playwright both claim the `.spec.ts` extension, so `vitest.config.ts`
+scopes `include` to `src/` — otherwise `vitest run` would try to execute the Playwright
+e2e specs (which need a browser) and fail. Keep unit tests under `src/`, e2e under `e2e/`.
 
 ## Don'ts
 
@@ -188,3 +237,7 @@ npx vitest run       # Vitest unit tests
 - **Never use icon libraries other than `lucide-react`.**
 - **Never hardcode user-visible strings** — always use `useTranslation()`.
 - **Never use CSS modules, styled-components, or inline style objects** — Tailwind only.
+- **Never call `Math.random()`/`Date.now()` in render** — lazy `useState(() => …)` initializer (React Compiler `purity`).
+- **Never seed/reset form state in a `useEffect(…, [open])`** — use the key-remount + lazy-init pattern (`set-state-in-effect`).
+- **Never use RHF `watch('x')`** — use `useWatch({ control, name: 'x' })` (`incompatible-library`).
+- **Never silence a React Compiler rule with an undocumented `eslint-disable`** — only `ConnectionGuard`'s fetch-on-mount carries a commented one. `bun run lint` must stay at zero.
