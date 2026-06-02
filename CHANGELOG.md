@@ -5,6 +5,33 @@ All notable changes to Picsou are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-06-02
+
+Patch release: a crash-recovery fix for invalid account currencies, a dependency
+security bump, and Docker image-tagging refinements.
+
+### Fixed
+
+- **Invalid currency codes no longer crash the whole app.** A manual account saved
+  with a non-ISO-4217 code (e.g. `AMAT`) made `Intl.NumberFormat` throw a `RangeError`
+  in `formatCurrency`; the throw bubbled to the root error boundary and blanked the
+  entire UI, leaving the offending account impossible to reach, edit, or delete.
+  `formatCurrency` now degrades to `"<amount> <code>"` instead of throwing (which also
+  rescues any already-persisted bad account), the account form uses a curated currency
+  dropdown with locale-aware labels, and the backend rejects unknown codes with a `400`
+  via a new `@ValidCurrency` constraint (`0703274`). Closes #9.
+
+### Security
+
+- **Dependency advisories patched.** `bcprov-jdk18on` 1.78.1 → 1.84 and `poi-ooxml`
+  5.3.0 → 5.4.0 (`5a7e776`).
+
+### Changed
+
+- **Docker image tagging.** `main` builds are now published as `latest` and version
+  tags drop the `v` prefix (`5f887ce`); deployment docs run from the published GHCR
+  images instead of building locally (`50dc0e1`).
+
 ## [1.0.0] — 2026-06-02
 
 First stable release. Builds on the MVP (commit `37920d1`) with multi-member
