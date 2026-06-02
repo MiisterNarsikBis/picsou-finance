@@ -46,7 +46,7 @@ export function ConnectionGuard({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-6 text-center max-w-sm mx-4">
-        <img src={picsouLogo} alt="Picsou" className="h-8 w-auto opacity-90" />
+        <img src={picsouLogo} alt="Picsou" className="h-8 w-auto opacity-90 brightness-0 dark:invert" />
         {status === 'checking' ? (
           <>
             <Loader2 className="size-8 text-primary animate-spin" />

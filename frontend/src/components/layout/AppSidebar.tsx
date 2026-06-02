@@ -120,7 +120,7 @@ export function AppSidebar() {
   return (
     <nav className="hidden md:flex h-fit max-h-[calc(100vh-2rem)] w-60 shrink-0 flex-col bg-background px-3 py-4 rounded-xl">
       {/* Logo */}
-      <img src={picsouLogo} alt="Picsou" className="h-7 w-auto opacity-90" />
+      <img src={picsouLogo} alt="Picsou" className="h-7 w-auto opacity-90 brightness-0 dark:invert" />
 
       {/* Nav items — evenly distributed */}
       <div className="flex flex-1 flex-col justify-evenly gap-3 mt-[47px]">

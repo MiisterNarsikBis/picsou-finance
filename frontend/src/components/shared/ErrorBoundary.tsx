@@ -18,7 +18,7 @@ function CrashFallback() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-6 text-center max-w-sm mx-4">
-        <img src={picsouLogo} alt="Picsou" className="h-8 w-auto opacity-90" />
+        <img src={picsouLogo} alt="Picsou" className="h-8 w-auto opacity-90 brightness-0 dark:invert" />
         <AlertTriangle className="size-10 text-destructive" />
         <h1 className="text-lg font-semibold">{t('error.crashTitle')}</h1>
         <p className="text-sm text-muted-foreground">{t('error.crashDesc')}</p>

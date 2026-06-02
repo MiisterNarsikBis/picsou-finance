@@ -72,7 +72,7 @@ export function MobileBottomNav() {
           <img
             src={picsouLogo}
             alt="Picsou"
-            className="h-8 w-auto opacity-90"
+            className="h-8 w-auto opacity-90 brightness-0 dark:invert"
           />
         </div>
 
