@@ -297,6 +297,32 @@ class GoalServiceTest {
     }
 
     @Test
+    void extendHistoryByMonth_decrementsByOneMonthFromCreatedAt() {
+        Goal goal = backfillGoal(null);
+        when(goalRepository.findByIdAndMemberId(1L, 1L)).thenReturn(java.util.Optional.of(goal));
+        when(goalRepository.save(goal)).thenReturn(goal);
+
+        GoalProgressResponse progress = goalService.extendHistoryByMonth(1L, 1L);
+
+        String expected = java.time.YearMonth.now().minusMonths(1).toString();
+        assertThat(goal.getHistoryStartMonth()).isEqualTo(expected);
+        assertThat(progress.historyStartMonth()).isEqualTo(expected);
+    }
+
+    @Test
+    void extendHistoryByMonth_decrementsFromExistingHistoryStart() {
+        String existing = java.time.YearMonth.now().minusMonths(1).toString();
+        Goal goal = backfillGoal(existing);
+        when(goalRepository.findByIdAndMemberId(1L, 1L)).thenReturn(java.util.Optional.of(goal));
+        when(goalRepository.save(goal)).thenReturn(goal);
+
+        goalService.extendHistoryByMonth(1L, 1L);
+
+        assertThat(goal.getHistoryStartMonth())
+            .isEqualTo(java.time.YearMonth.now().minusMonths(2).toString());
+    }
+
+    @Test
     void isOnTrack_unaffectedByHistoryStart() {
         // History extended far back with no data → on-track stays anchored to createdAt
         // (created this month → no past months → benefit of the doubt).

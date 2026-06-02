@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useGoal, useGoalMonths, useSetMonthOverride, useDeleteMonthOverride, useSetManualContribution, useDeleteManualContribution, useExtendGoalHistory } from '@/features/goals/hooks'
+import { useGoal, useGoalMonths, useSetMonthOverride, useDeleteMonthOverride, useSetManualContribution, useDeleteManualContribution, useExtendGoalHistory, useExtendGoalHistoryByMonth } from '@/features/goals/hooks'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { NumericInput } from '@/components/shared/NumericInput'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Calendar, LayoutGrid, Clock, Loader2 } from 'lucide-react'
+import { ArrowLeft, Calendar, LayoutGrid, Clock, Loader2, Plus } from 'lucide-react'
 import { cn, parseAmount, getLocale } from '@/lib/utils'
 import type { GoalMonthEntry } from '@/types/api'
 
@@ -124,10 +124,13 @@ function formatCompact(value: number): string {
 // View: Year Grid (default)
 // ---------------------------------------------------------------------------
 
-function YearGridView({ months, selectedYm, onSelect }: {
+function YearGridView({ months, selectedYm, onSelect, onAddPreviousMonth, isAddingMonth }: {
   months: GoalMonthEntry[]; selectedYm: string | null; onSelect: (ym: string) => void
+  onAddPreviousMonth: () => void; isAddingMonth: boolean
 }) {
+  const { t } = useTranslation()
   const years = useMemo(() => groupByYear((months ?? []).filter(e => isPastOrCurrent(e.yearMonth))), [months])
+  const earliestYear = years[0]?.year
 
   return (
     <div className="space-y-4">
@@ -139,6 +142,23 @@ function YearGridView({ months, selectedYm, onSelect }: {
           <CardContent className="pb-4 pt-3 px-4">
             <div className="overflow-x-auto">
               <div className="flex gap-3 min-w-max">
+                {year === earliestYear && (
+                  <button
+                    type="button"
+                    onClick={onAddPreviousMonth}
+                    disabled={isAddingMonth}
+                    title={t('goals.addPreviousMonth')}
+                    aria-label={t('goals.addPreviousMonth')}
+                    className="flex flex-col items-center justify-center gap-[9px] rounded-xl border border-dashed border-border px-2 py-3 transition-colors cursor-pointer min-w-[90px] text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAddingMonth
+                      ? <Loader2 className="size-5 animate-spin" />
+                      : <Plus className="size-5" />}
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] leading-tight text-center">
+                      {t('goals.addPreviousMonth')}
+                    </span>
+                  </button>
+                )}
                 {entries.map(entry => {
                   const isSelected = selectedYm === entry.yearMonth
                   const hasOverride = entry.override != null
@@ -470,6 +490,7 @@ export function GoalCalendarPage() {
   const { data: goal, isLoading: goalLoading, error: goalError } = useGoal(goalId)
   const { data: months, isLoading: monthsLoading } = useGoalMonths(goalId)
   const extendHistory = useExtendGoalHistory()
+  const extendHistoryByMonth = useExtendGoalHistoryByMonth()
 
   const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'calendar'>('grid')
   const [selectedYm, setSelectedYm] = useState<string | null>(null)
@@ -592,7 +613,13 @@ export function GoalCalendarPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
         <div className="min-w-0 space-y-4">
           {viewMode === 'grid' && (
-            <YearGridView months={months ?? []} selectedYm={selectedYm} onSelect={setSelectedYm} />
+            <YearGridView
+              months={months ?? []}
+              selectedYm={selectedYm}
+              onSelect={setSelectedYm}
+              onAddPreviousMonth={() => extendHistoryByMonth.mutate(goalId)}
+              isAddingMonth={extendHistoryByMonth.isPending}
+            />
           )}
           {viewMode === 'timeline' && (
             <TimelineView months={months ?? []} selectedYm={selectedYm} onSelect={setSelectedYm} />

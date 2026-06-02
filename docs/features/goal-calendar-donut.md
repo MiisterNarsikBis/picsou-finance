@@ -1,6 +1,6 @@
 # Feature: Goal Calendar — Grid View (donuts)
 
-> Last updated: 2026-05-29 (responsive side-panel / bottom-sheet layout)
+> Last updated: 2026-06-02 ("+ previous month" backfill card in the grid)
 
 ## Context
 
@@ -71,6 +71,8 @@ The selected month's `MonthDetailPanel` is shown *beside* the calendar, not stac
 ### History backfill card
 
 A slim `<Card>` above the 2-column layout offers "+ Add {year}" (`goals.addYear`), where `year = earliestRenderedYear - 1`. It calls `useExtendGoalHistory()` → `POST /goals/{id}/history/extend`, extending the calendar one year earlier. See [goals.md](./goals.md) → *History backfill*.
+
+Additionally, a dashed **"+ previous month"** card (`goals.addPreviousMonth`) is prepended to the *earliest* year's month row inside `YearGridView` (gated on `year === years[0].year`). It calls `useExtendGoalHistoryByMonth()` → `POST /goals/{id}/history/extend/month`, extending the calendar one month earlier per click — for fine-grained backfill of the months before goal creation (e.g. the earlier months of the current year). Crossing January makes a previous-year card appear. Same 80px-card dimensions as the month buttons (`min-w-[90px]`); shows a `Plus` icon (or `Loader2` while pending).
 
 ## Technical choices
 

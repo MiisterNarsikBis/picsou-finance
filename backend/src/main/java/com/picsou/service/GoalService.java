@@ -319,6 +319,20 @@ public class GoalService {
         return toProgressResponse(goalRepository.save(goal));
     }
 
+    /**
+     * Extends the goal's calendar one month further into the past. Used by the
+     * "+ previous month" card in the grid for fine-grained backfill (vs the
+     * one-year jump of {@link #extendHistory}). Like the yearly variant, this
+     * does NOT affect the on-track calculation, which stays anchored to createdAt.
+     */
+    @Transactional
+    public GoalProgressResponse extendHistoryByMonth(Long goalId, Long memberId) {
+        Goal goal = getOrThrow(goalId, memberId);
+        YearMonth extended = effectiveStartMonth(goal).minusMonths(1);
+        goal.setHistoryStartMonth(extended.toString());
+        return toProgressResponse(goalRepository.save(goal));
+    }
+
     @Transactional
     public GoalMonthEntryResponse setMonthOverride(Long goalId, String yearMonth, BigDecimal amount, Long memberId) {
         Goal goal = getOrThrow(goalId, memberId);

@@ -81,6 +81,17 @@ export function useExtendGoalHistory() {
   })
 }
 
+export function useExtendGoalHistoryByMonth() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => goalsApi.extendHistoryByMonth(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['goals', id, 'months'] })
+      queryClient.invalidateQueries({ queryKey: ['goals', id] })
+    },
+  })
+}
+
 export function useSetMonthOverride() {
   const queryClient = useQueryClient()
   return useMutation({

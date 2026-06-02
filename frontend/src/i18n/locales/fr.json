@@ -308,6 +308,7 @@
     "clickMonthHint": "Cliquez sur un mois pour voir les détails",
     "backfillHint": "Ajoutez d'anciennes contributions antérieures à la création de l'objectif.",
     "addYear": "+ Ajouter {{year}}",
+    "addPreviousMonth": "Mois précédent",
     "noData": "—",
     "futureMonth": "···",
     "linkedAccounts": "Comptes liés",

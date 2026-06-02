@@ -165,6 +165,7 @@ for (let i = 1; i <= 3; i++) {
   handlers.set(key('GET', `/goals/${i}`), () => mockGoals[i - 1])
   handlers.set(key('GET', `/goals/${i}/months`), () => generateMockMonths(mockGoals[i - 1]))
   handlers.set(key('POST', `/goals/${i}/history/extend`), () => mockGoals[i - 1])
+  handlers.set(key('POST', `/goals/${i}/history/extend/month`), () => mockGoals[i - 1])
 }
 handlers.set(key('POST', '/goals'), (config) => {
   const body = JSON.parse(config.data || '{}')

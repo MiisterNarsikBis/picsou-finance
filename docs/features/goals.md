@@ -1,6 +1,6 @@
 # Feature: Goals
 
-> Last updated: 2026-05-29 (history backfill before goal creation + avg manual-contribution fallback)
+> Last updated: 2026-06-02 (month-by-month backfill alongside yearly backfill)
 
 ## Context
 
@@ -47,6 +47,7 @@ Users often start a goal in Picsou after they've already been saving for it. The
 - **`Goal.historyStartMonth`** (`VARCHAR(7)`, nullable, format `"YYYY-MM"`): when set and earlier than the `createdAt` month, the monthly calendar starts from this month. `null` keeps the default (`createdAt`-derived) start. Added in migration `V32__goal_history_start.sql`.
 - **`GoalService.effectiveStartMonth(goal)`**: returns `min(createdAt month, historyStartMonth)` — the single source of truth for where the calendar begins.
 - **`POST /api/goals/{id}/history/extend`** → `GoalService.extendHistory()`: decrements the effective start by one year and persists it as the new `historyStartMonth`. The frontend exposes this via a slim "+ Add {year}" card above the calendar (`useExtendGoalHistory`), where `year = earliestRenderedYear - 1`.
+- **`POST /api/goals/{id}/history/extend/month`** → `GoalService.extendHistoryByMonth()`: same mechanism but decrements the effective start by a single month — for fine-grained backfill (e.g. only the earlier months of the current year, before goal creation). The frontend exposes this via a "+ previous month" card prepended to the earliest year's month row in the grid (`useExtendGoalHistoryByMonth`). Both endpoints coexist: yearly jumps and month-by-month refinement.
 - Backfilled months have no snapshot data, so they render empty until the user fills them in manually.
 - **`isOnTrack` is deliberately NOT affected by backfill**: it stays anchored to `createdAt` (`isOnTrackFromPastMonths` is unchanged). Backfill is history-only — when actuals come from linked accounts, extending the window backwards must not retroactively change the "on track" verdict. Backfilled manual contributions *do* feed `avgMonthlyContribution` (see above), refining the "average monthly" figure for manually-tracked goals.
 

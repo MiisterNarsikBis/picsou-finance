@@ -68,6 +68,11 @@ public class GoalController {
         return goalService.extendHistory(id, userContext.currentMemberId());
     }
 
+    @PostMapping("/{id}/history/extend/month")
+    public GoalProgressResponse extendHistoryByMonth(@PathVariable Long id) {
+        return goalService.extendHistoryByMonth(id, userContext.currentMemberId());
+    }
+
     @PutMapping("/{id}/months/{yearMonth}")
     public GoalMonthEntryResponse setMonthOverride(
         @PathVariable Long id,
