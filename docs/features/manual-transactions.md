@@ -25,7 +25,7 @@ CREATE INDEX idx_transaction_account_manual ON transaction(account_id, is_manual
 
 Existing synced transactions have `is_manual = false`. The original `type` column (Finary raw category string) is untouched.
 
-### Security name column (V33 migration)
+### Security name column (V36 migration)
 
 A later migration adds a first-class label for derived positions:
 
@@ -103,7 +103,7 @@ After submit, `useAddTransaction` / `useDeleteTransaction` hooks invalidate the 
 | File | Role |
 |------|------|
 | `db/migration/V24__manual_transactions.sql` | Schema extension (is_manual, tx_type, ticker, quantity, price_per_unit) |
-| `db/migration/V33__transaction_security_name.sql` | Adds `transaction.name` (position label) |
+| `db/migration/V36__transaction_security_name.sql` | Adds `transaction.name` (position label) |
 | `model/TransactionType.java` | Enum (DEPOSIT, WITHDRAWAL, BUY, SELL, DIVIDEND, FEE) |
 | `service/HoldingComputeService.java` | Derives holdings (qty, VWAP, **name**) from BUY/SELL transactions |
 | `service/ManualTransactionService.java` | Orchestrates add/edit/delete + re-derivation; resolves ISIN and owns the BUY/SELL description (`applyInstrumentFields`) |
