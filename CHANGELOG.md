@@ -5,6 +5,33 @@ All notable changes to Picsou are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] — 2026-06-03
+
+Patch release: clearer Enable Banking setup, an honest admin configuration view,
+and integration toggles that reflect what's actually configured.
+
+### Changed
+
+- **Enable Banking now asks for a single "Application ID" instead of two near-identical
+  fields.** Per Enable Banking's spec the JWT `kid` *is* the application's ID and the key
+  file is named `<applicationId>.pem`, so the "Key ID" was never a distinct value — users
+  retyped the same UUID twice, an easy way to mis-key one. Both the setup wizard and
+  Admin → Integrations now collect only the Application ID and derive the Key ID from it,
+  with a hint explaining they're the same value. Existing installs that set
+  `ENABLEBANKING_KEY_ID` (env) or have a `key-id` row keep working — `keyId()` honors an
+  explicitly-configured value and only falls back to the Application ID otherwise.
+
+### Fixed
+
+- **Admin → Integrations no longer shows Enable Banking as "not configured" when it works.**
+  The settings view read raw DB rows while the connector resolves credentials DB-then-env,
+  so an install configured via `.env` saw empty fields and a false warning banner. The
+  admin view now reads the same resolved provider the connector uses.
+- **Integration toggles reflect actual configuration, not just a stored boolean.** An
+  integration configured via `.env`/Docker (Enable Banking, Trade Republic, Finary) now
+  reports as enabled even with no DB intent-flag set — the toggle is `stored-flag OR
+  detected-config` rather than trusting the flag alone.
+
 ## [1.0.2] — 2026-06-02
 
 Patch release: fixes a **403** that blocked login and the setup wizard's **Origins**
