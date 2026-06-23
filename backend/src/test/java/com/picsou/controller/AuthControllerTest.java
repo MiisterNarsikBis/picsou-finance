@@ -15,6 +15,7 @@ import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import jakarta.servlet.http.Cookie;
@@ -31,8 +34,12 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -201,6 +208,56 @@ class AuthControllerTest {
 
         verify(cookieWriter).setAccessAndRefresh(httpRes, "acc", "ref");
         verify(cookieWriter, never()).clearPersistent(httpRes);
+    }
+
+    @Test
+    void login_unknownUserAndWrongPassword_payIdenticalBcryptCost_soLatencyRevealsNothing() {
+        // Drive the controller with a REAL bcrypt encoder (strength 12, same as prod —
+        // see SecurityConfig) so the dummy-hash comparison performs genuine work, which
+        // is the whole point of the timing fix. A spy lets us count the bcrypt calls and
+        // inspect the hashes they ran against.
+        PasswordEncoder realEncoder = spy(new BCryptPasswordEncoder(12));
+        AuthController timingController = new AuthController(
+            userRepository, realEncoder, jwtUtil,
+            loginBuckets, mfaVerifyBuckets, cookieWriter,
+            mfaService, persistentSessionService, auditService, false);
+
+        // Path A — the username does not exist: there is no stored hash to compare,
+        // yet the request must still cost a full bcrypt round against the dummy hash.
+        when(userRepository.findByUsernameWithMember("ghost")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> timingController.login(
+                new LoginRequest("ghost", "pw", false), httpReq, httpRes))
+            .isInstanceOf(BadCredentialsException.class)
+            .hasMessage("Invalid credentials");
+
+        // Path B — the username exists but the password is wrong. The stored hash is a
+        // real bcrypt hash of a DIFFERENT secret, so "pw" does not match.
+        AppUser known = AppUser.builder()
+            .id(7L).username("alice")
+            .role(UserRole.ADMIN)
+            .passwordHash(realEncoder.encode("the-real-password"))
+            .activated(true)
+            .tokenVersion(3L)
+            .member(FamilyMember.builder().id(42L).displayName("Alice").build())
+            .build();
+        when(userRepository.findByUsernameWithMember("alice")).thenReturn(Optional.of(known));
+        assertThatThrownBy(() -> timingController.login(
+                new LoginRequest("alice", "pw", false), httpReq, httpRes))
+            .isInstanceOf(BadCredentialsException.class)
+            .hasMessage("Invalid credentials");
+
+        // The two failing paths are indistinguishable by wall-clock time: each ran
+        // EXACTLY one bcrypt comparison, each against a real $2a$12$ hash of the SAME
+        // cost factor, each fed the submitted password. Path A used the constructor's
+        // dummy hash, Path B the user's stored hash — same work, no enumeration oracle.
+        ArgumentCaptor<String> hashUsed = ArgumentCaptor.forClass(String.class);
+        verify(realEncoder, times(2)).matches(eq("pw"), hashUsed.capture());
+        assertThat(hashUsed.getAllValues())
+            .hasSize(2)
+            .allSatisfy(h -> assertThat(h).startsWith("$2a$12$"));
+
+        // ...and neither failing path leaks a session.
+        verify(cookieWriter, never()).setAccessAndRefresh(any(), any(), any());
     }
 
     // ─── mfa/verify ──────────────────────────────────────────────────────
