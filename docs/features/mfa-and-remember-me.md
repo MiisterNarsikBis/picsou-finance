@@ -395,6 +395,7 @@ All UIs are mobile-responsive (per repo convention).
 | Brute-force TOTP | Rate limit 5/15 min per uid + ±1 tolerance window only |
 | Brute-force recovery codes | bcrypt cost 12 (~250 ms/check) + same rate limit |
 | User reactivates after admin force-disable | Admin disable wipes persistent sessions; user must log in fresh and re-enroll |
+| Username enumeration via login timing (CWE-208, GHSA-ww5m-pxgq-8qq6) | Unknown-user path runs a decoy bcrypt `matches()` so it costs the same as a wrong-password attempt — see [login-timing-attack.md](./login-timing-attack.md) |
 | Admin resets a (possibly compromised) member's password | `AuthController.activate` — the shared sink for new-member activation, admin-initiated password reset (`FamilyService.resetPasswordToken`) and admin-recovery completion — bumps `tokenVersion` and calls `PersistentSessionService.revokeAllForUser`, exactly like self-service `change-password`. The member's pre-existing access/refresh JWTs and Remember-Me cookies are all invalidated (CWE-613/640). |
 | Account enumeration via login timing on pending-activation members | An invited-but-not-activated member has a blank `password_hash`; `passwordEncoder.matches(pw, "")` short-circuits without bcrypt. `AuthController.login` now runs the same dummy-hash bcrypt round for a blank stored hash and fails like a wrong password, so the unknown-user, wrong-password and pending-activation paths are timing-indistinguishable (CWE-208). |
 

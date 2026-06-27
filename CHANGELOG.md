@@ -7,8 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.8] — 2026-06-27
+
+Security release: remediations from a 2026-06-27 security audit, the login
+username-enumeration fix, and import/build fixes.
+
 ### Security
 
+- **Login no longer leaks which usernames exist (GHSA-ww5m-pxgq-8qq6, CWE-208).**
+  An unknown username now runs a decoy bcrypt comparison so its response latency
+  matches a wrong-password attempt, closing the enumeration timing oracle.
+- **Goals can no longer read another member's accounts (IDOR, CWE-639).**
+  `GoalService.create`/`update` resolve account ids through a member-scoped
+  finder instead of the unscoped `findAllById`, so a member cannot attach — and
+  read the live balance of — accounts they do not own.
 - **Admin password reset now invalidates the member's existing sessions
   (CWE-613/640).** `POST /api/auth/activate/{token}` is the shared sink for
   new-member activation, admin-initiated password reset
@@ -27,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored hash is blank and fails exactly like a wrong password, so all three
   failing paths are timing-indistinguishable. Behavior for activated users is
   unchanged.
+- **Static assets keep their security headers.** The nginx cache block no longer
+  drops `nosniff`/CSP/`X-Frame-Options`/HSTS for `.js`/`.css` responses.
 
 ### Fixed
 
@@ -51,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   account shape under a synthetic `loans` category, so loans flow through the
   normal preview/mapping/execute pipeline and map to `AccountType.LOAN`. The
   outstanding amount is stored as a negative balance (a loan is a liability).
+- **Frontend `Transaction` types declare the `name` field (#12).** A `name`
+  field added to transactions wasn't declared on the TypeScript interfaces,
+  breaking `tsc -b` (and the Docker image build) on `main`.
 
 ## [1.0.7] — 2026-06-04
 
