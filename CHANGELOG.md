@@ -17,23 +17,46 @@ username-enumeration fix, and import/build fixes.
 - **Login no longer leaks which usernames exist (GHSA-ww5m-pxgq-8qq6, CWE-208).**
   An unknown username now runs a decoy bcrypt comparison so its response latency
   matches a wrong-password attempt, closing the enumeration timing oracle.
-  Pending-activation members (blank password hash) take the same decoy path.
 - **Goals can no longer read another member's accounts (IDOR, CWE-639).**
   `GoalService.create`/`update` resolve account ids through a member-scoped
   finder instead of the unscoped `findAllById`, so a member cannot attach — and
   read the live balance of — accounts they do not own.
-- **Admin password reset now terminates the target's sessions (CWE-613).**
-  `activate()` bumps the token version and revokes persistent ("Remember Me")
-  sessions, matching the self-service password change.
-- **MCP scope enforcement runs with the caller's identity on the tool thread.**
-  The `SecurityContext` is propagated to the Reactor scheduler thread via a
-  self-clearing accessor, so scoped MCP tools enforce correctly with no
-  cross-request identity bleed.
+- **Admin password reset now invalidates the member's existing sessions
+  (CWE-613/640).** `POST /api/auth/activate/{token}` is the shared sink for
+  new-member activation, admin-initiated password reset
+  (`FamilyService.resetPasswordToken`) and admin-recovery completion. It set the
+  new password hash but — unlike self-service `change-password` — never bumped
+  `tokenVersion` or revoked persistent sessions, so after an admin reset a
+  (possibly compromised) member's old access/refresh JWTs and Remember-Me cookies
+  stayed valid. `activate()` now bumps `tokenVersion` and calls
+  `PersistentSessionService.revokeAllForUser`, mirroring `change-password`.
+- **Closed a login timing oracle for pending-activation members (CWE-208).** An
+  invited-but-not-activated member has a blank `password_hash`, and
+  `passwordEncoder.matches(pw, "")` short-circuits without running bcrypt — making
+  that path measurably faster than the unknown-user and wrong-password paths and
+  letting an attacker tell a "pending-activation profile" apart from "no such
+  user". `POST /api/auth/login` now runs the same dummy-hash bcrypt round when the
+  stored hash is blank and fails exactly like a wrong password, so all three
+  failing paths are timing-indistinguishable. Behavior for activated users is
+  unchanged.
 - **Static assets keep their security headers.** The nginx cache block no longer
   drops `nosniff`/CSP/`X-Frame-Options`/HSTS for `.js`/`.css` responses.
 
 ### Fixed
 
+- **Scoped MCP tools work again — the security context now survives the
+  servlet→tool thread hop.** Spring AI runs `@Tool` methods on a Reactor
+  scheduler thread, but `AccessKeyAuthFilter` authenticates the `psk_` key on the
+  Tomcat servlet thread by setting `SecurityContextHolder` (a `ThreadLocal`). The
+  tool thread therefore saw no `Authentication`, so `ScopeEnforcementAspect`
+  found no scopes and every scoped `tools/call` failed closed with "missing
+  scope" — even for keys that held the scope. A `SecurityContextThreadLocalAccessor`
+  is now registered with the Micrometer `ContextRegistry` and Reactor's automatic
+  context propagation is enabled (`McpSecurityContextPropagationConfig`), so the
+  context is captured at subscription and re-installed around tool execution. The
+  accessor self-clears on every reset/close path, so a pooled scheduler thread
+  never leaks one request's identity into the next. See
+  [docs/lessons/thread-local-context-across-async-hop.md](docs/lessons/thread-local-context-across-async-hop.md).
 - **Finary loan accounts are now imported (issue #11).** Loan/mortgage accounts
   are exposed by Finary through a dedicated `/loans` endpoint, not the portfolio
   `credits`/`credit_accounts` categories that the API sync queried — so they
