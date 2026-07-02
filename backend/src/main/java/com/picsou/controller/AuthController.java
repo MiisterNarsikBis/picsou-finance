@@ -236,10 +236,27 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(HttpServletRequest httpReq, HttpServletResponse httpRes) {
+    public ResponseEntity<?> refresh(
+        @AuthenticationPrincipal AppUser persistentPrincipal,
+        HttpServletRequest httpReq, HttpServletResponse httpRes
+    ) {
         String refreshToken = extractCookie(httpReq, "refresh_token");
 
         if (refreshToken == null) {
+            // No refresh_token cookie doesn't necessarily mean "logged out": if a
+            // still-valid persistent_token (Remember Me) was presented, PersistentTokenAuthFilter
+            // already re-authenticated this request and minted fresh access/refresh
+            // cookies on the response before this method ran. Honour that instead of
+            // reporting 401, otherwise "Remember Me" silently stops working once the
+            // refresh_token (7 days) outlives the persistent_token's own refresh cadence.
+            if (persistentPrincipal != null) {
+                return ResponseEntity.ok(Map.of(
+                    "username", persistentPrincipal.getUsername(),
+                    "role", persistentPrincipal.getRole().name(),
+                    "memberId", persistentPrincipal.getMember().getId(),
+                    "displayName", persistentPrincipal.getMember().getDisplayName()
+                ));
+            }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "No refresh token"));
         }

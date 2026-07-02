@@ -379,7 +379,7 @@ class AuthControllerTest {
         when(userRepository.findByUsernameWithMember("alice")).thenReturn(Optional.of(deactivated));
         when(jwtUtil.getTokenVersion(claims)).thenReturn(3L); // matches user.tokenVersion
 
-        ResponseEntity<?> res = controller.refresh(httpReq, httpRes);
+        ResponseEntity<?> res = controller.refresh(null, httpReq, httpRes);
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(cookieWriter).clearAuthCookies(httpRes);
@@ -399,9 +399,35 @@ class AuthControllerTest {
         when(jwtUtil.generateAccessToken(active)).thenReturn("acc2");
         when(jwtUtil.generateRefreshToken(active)).thenReturn("ref2");
 
-        ResponseEntity<?> res = controller.refresh(httpReq, httpRes);
+        ResponseEntity<?> res = controller.refresh(null, httpReq, httpRes);
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(cookieWriter).setAccessAndRefresh(httpRes, "acc2", "ref2");
+    }
+
+    @Test
+    void refresh_returns200_fromPersistentPrincipal_whenNoRefreshTokenCookie() {
+        // No refresh_token cookie in the request, but PersistentTokenAuthFilter
+        // already re-authenticated this request from a valid persistent_token
+        // and minted fresh cookies on the response one filter earlier.
+        AppUser active = user(true);
+
+        ResponseEntity<?> res = controller.refresh(active, httpReq, httpRes);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).isEqualTo(Map.of(
+            "username", active.getUsername(),
+            "role", active.getRole().name(),
+            "memberId", active.getMember().getId(),
+            "displayName", active.getMember().getDisplayName()
+        ));
+        verify(jwtUtil, never()).generateAccessToken(any());
+    }
+
+    @Test
+    void refresh_returns401_whenNoRefreshTokenCookie_andNoPersistentPrincipal() {
+        ResponseEntity<?> res = controller.refresh(null, httpReq, httpRes);
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }

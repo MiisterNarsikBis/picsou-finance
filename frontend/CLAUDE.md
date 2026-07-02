@@ -35,7 +35,7 @@ src/
 
 **Server state:** TanStack Query via hooks in `features/*/hooks.ts`. No Redux, no Context for server data. Query keys co-located in hook files. Stale times in `lib/constants.ts`.
 
-**Auth guard:** `RequireAuth` in `features/auth/guards.tsx` checks `sessionStorage.getItem('picsou_user')`. Cookie is HttpOnly (invisible to JS) — sessionStorage is the JS-readable signal.
+**Auth guard:** `RequireAuth` in `features/auth/guards.tsx` checks `sessionStorage.getItem('picsou_user')` (JS-readable signal; the actual session cookies are HttpOnly). sessionStorage doesn't survive a tab/browser close, so when it's empty `RequireAuth` probes the cookie-backed session once via `POST /auth/refresh` before redirecting to `/login` — this is what makes "Remember Me" (`persistent_token`, 90 days) actually keep users signed in across restarts instead of only within a single tab session.
 
 **Routing:** React Router v7 in `app/routes.tsx`. Lazy code-splitting per page. `/sync/callback` and `/sync` share SyncPage (OAuth redirect target).
 
