@@ -26,9 +26,9 @@ export const bankSyncApi = {
       )
       .then(r => r.data),
 
-  initiate: (institutionId: string, institutionName: string, logoUrl?: string | null) =>
+  initiate: (institutionId: string, institutionName: string) =>
     api
-      .post<{ requisitionId: string; authLink: string }>('/sync/initiate', { institutionId, institutionName, logoUrl })
+      .post<{ requisitionId: string; authLink: string }>('/sync/initiate', { institutionId, institutionName })
       .then(r => r.data),
 
   complete: (code: string) =>

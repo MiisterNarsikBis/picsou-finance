@@ -39,6 +39,35 @@ class SyncServiceTest {
 
     @InjectMocks SyncService syncService;
 
+    /**
+     * initiateConnection resolves the logo itself from the server-side institution
+     * catalog (matched by exact institutionId) -- there is no client-supplied logoUrl
+     * to trust or persist.
+     */
+    @Test
+    void initiateConnection_resolvesLogoUrlServerSideByExactInstitutionId() {
+        Long memberId = 5L;
+        FamilyMember member = FamilyMember.builder().id(memberId).displayName("Owner").build();
+        when(familyMemberRepository.findById(memberId)).thenReturn(Optional.of(member));
+
+        when(bankConnector.initiateConnection("BNP_PARIBAS::FR"))
+            .thenReturn(new BankConnectorPort.InitiateResult("auth-1", "https://auth.example/link"));
+
+        InstitutionData wrongCountry = new InstitutionData("BNP_PARIBAS::BE", "BNP Paribas", "GEBABEBB",
+            "https://logos.example/bnp-be.png", "BE");
+        InstitutionData exact = new InstitutionData("BNP_PARIBAS::FR", "BNP Paribas", "BNPAFRPP",
+            "https://logos.example/bnp-fr.png", "FR");
+        when(bankConnector.searchInstitutions("BNP Paribas", "FR")).thenReturn(List.of(wrongCountry, exact));
+
+        when(requisitionRepository.save(any(Requisition.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        syncService.initiateConnection("BNP_PARIBAS::FR", "BNP Paribas", memberId);
+
+        ArgumentCaptor<Requisition> captor = ArgumentCaptor.forClass(Requisition.class);
+        verify(requisitionRepository).save(captor.capture());
+        assertThat(captor.getValue().getLogoUrl()).isEqualTo("https://logos.example/bnp-fr.png");
+    }
+
     /** New accounts created from a requisition that already carries a logo get it copied over. */
     @Test
     void completeConnection_copiesLogoUrlFromRequisitionOntoNewAccount() {
@@ -103,13 +132,72 @@ class SyncServiceTest {
 
         InstitutionData match = new InstitutionData("BOURSOBANK::FR", "BoursoBank", "BNPAFRPP",
             "https://logos.example/bourso.png", "FR");
-        when(bankConnector.searchInstitutions("BoursoBank", null)).thenReturn(List.of(match));
+        when(bankConnector.searchInstitutions("BoursoBank", "FR")).thenReturn(List.of(match));
 
         when(bankConnector.fetchBalances("session-2")).thenReturn(List.of());
 
         syncService.resyncAll(memberId);
 
         assertThat(requisition.getLogoUrl()).isEqualTo("https://logos.example/bourso.png");
+        assertThat(requisition.getLogoBackfillAttemptedAt()).isNotNull();
+    }
+
+    /** Once a backfill attempt has run (hit or miss), it must not be retried on every subsequent sync. */
+    @Test
+    void resyncAll_doesNotRetryBackfillOnceAttempted() {
+        Long memberId = 21L;
+        FamilyMember member = FamilyMember.builder().id(memberId).displayName("Owner").build();
+
+        Requisition requisition = Requisition.builder()
+            .id(21L)
+            .member(member)
+            .requisitionId("session-21")
+            .institutionId("RENAMED_BANK::FR")
+            .institutionName("Renamed Bank")
+            .logoUrl(null)
+            .logoBackfillAttemptedAt(java.time.Instant.now())
+            .status(RequisitionStatus.LINKED)
+            .build();
+
+        when(requisitionRepository.findByStatusAndMemberIdOrderByCreatedAtDesc(RequisitionStatus.LINKED, memberId))
+            .thenReturn(List.of(requisition));
+        when(bankConnector.fetchBalances("session-21")).thenReturn(List.of());
+
+        syncService.resyncAll(memberId);
+
+        verify(bankConnector, org.mockito.Mockito.never()).searchInstitutions(any(), any());
+        assertThat(requisition.getLogoUrl()).isNull();
+    }
+
+    /** When both an exact id match and a same-named institution from another country are returned, the id wins. */
+    @Test
+    void resyncAll_backfillPrefersExactIdMatchOverName() {
+        Long memberId = 22L;
+        FamilyMember member = FamilyMember.builder().id(memberId).displayName("Owner").build();
+
+        Requisition requisition = Requisition.builder()
+            .id(22L)
+            .member(member)
+            .requisitionId("session-22")
+            .institutionId("REVOLUT::FR")
+            .institutionName("Revolut")
+            .logoUrl(null)
+            .status(RequisitionStatus.LINKED)
+            .build();
+
+        when(requisitionRepository.findByStatusAndMemberIdOrderByCreatedAtDesc(RequisitionStatus.LINKED, memberId))
+            .thenReturn(List.of(requisition));
+
+        InstitutionData wrongCountryMatch = new InstitutionData("REVOLUT::LT", "Revolut", "REVOLT21",
+            "https://logos.example/revolut-lt.png", "LT");
+        InstitutionData exactMatch = new InstitutionData("REVOLUT::FR", "Revolut", "REVOLT21",
+            "https://logos.example/revolut-fr.png", "FR");
+        when(bankConnector.searchInstitutions("Revolut", "FR")).thenReturn(List.of(wrongCountryMatch, exactMatch));
+        when(bankConnector.fetchBalances("session-22")).thenReturn(List.of());
+
+        syncService.resyncAll(memberId);
+
+        assertThat(requisition.getLogoUrl()).isEqualTo("https://logos.example/revolut-fr.png");
     }
 
     /** A failed institution search during backfill must not break the resync loop. */
@@ -130,7 +218,7 @@ class SyncServiceTest {
 
         when(requisitionRepository.findByStatusAndMemberIdOrderByCreatedAtDesc(RequisitionStatus.LINKED, memberId))
             .thenReturn(List.of(requisition));
-        when(bankConnector.searchInstitutions("Unknown Bank", null))
+        when(bankConnector.searchInstitutions("Unknown Bank", "FR"))
             .thenThrow(new RuntimeException("provider unavailable"));
         when(bankConnector.fetchBalances("session-3")).thenReturn(List.of());
 

@@ -56,12 +56,10 @@ export function useInitiateBankSync() {
     mutationFn: ({
       institutionId,
       institutionName,
-      logoUrl,
     }: {
       institutionId: string
       institutionName: string
-      logoUrl?: string | null
-    }) => bankSyncApi.initiate(institutionId, institutionName, logoUrl),
+    }) => bankSyncApi.initiate(institutionId, institutionName),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: syncKeys.banks() })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })

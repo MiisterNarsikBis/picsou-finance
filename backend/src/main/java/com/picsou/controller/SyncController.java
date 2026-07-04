@@ -56,7 +56,6 @@ public class SyncController {
         SyncService.InitiateResponse response = syncService.initiateConnection(
             req.institutionId(),
             req.institutionName(),
-            req.logoUrl(),
             userContext.currentMemberId()
         );
         return ResponseEntity.ok(response);
@@ -90,5 +89,5 @@ public class SyncController {
         return bucket.tryConsume(1);
     }
 
-    record InitiateRequest(String institutionId, String institutionName, String logoUrl) {}
+    record InitiateRequest(String institutionId, String institutionName) {}
 }

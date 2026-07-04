@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Account } from '@/types/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { AccountTypeBadge } from '@/components/shared/AccountTypeBadge'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDate } from '@/lib/utils'
 
 interface AccountCardProps {
@@ -12,19 +12,11 @@ interface AccountCardProps {
 }
 
 function AccountAvatar({ logoUrl, color }: { logoUrl: string | null; color: string }) {
-  const [failed, setFailed] = useState(false)
-
-  if (!logoUrl || failed) {
-    return <div className="mt-1 size-10 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-  }
-
   return (
-    <img
-      src={logoUrl}
-      alt=""
-      className="mt-1 size-10 shrink-0 rounded-full border border-border bg-white object-contain p-1"
-      onError={() => setFailed(true)}
-    />
+    <Avatar className="mt-1 size-10 shrink-0 bg-white">
+      {logoUrl && <AvatarImage src={logoUrl} alt="" className="object-contain p-1" />}
+      <AvatarFallback style={{ backgroundColor: color }} />
+    </Avatar>
   )
 }
 

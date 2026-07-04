@@ -34,8 +34,12 @@ public class Requisition extends AuditableEntity {
     @Column(name = "institution_name", length = 200)
     private String institutionName;
 
-    @Column(name = "logo_url", length = 500)
+    @Column(name = "logo_url", columnDefinition = "TEXT")
     private String logoUrl;
+
+    /** Set the first time a logo backfill lookup is attempted, so a permanent miss isn't retried on every sync. */
+    @Column(name = "logo_backfill_attempted_at")
+    private Instant logoBackfillAttemptedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "requisition_status")

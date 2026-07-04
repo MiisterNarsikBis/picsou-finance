@@ -64,7 +64,7 @@ public class Account extends AuditableEntity {
     private String ticker;
 
     /** Bank logo URL, captured from Enable Banking institution search. Null falls back to {@link #color}. */
-    @Column(name = "logo_url", length = 500)
+    @Column(name = "logo_url", columnDefinition = "TEXT")
     private String logoUrl;
 
     @Column(name = "deleted_at")
