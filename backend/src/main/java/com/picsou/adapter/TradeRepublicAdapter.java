@@ -263,12 +263,13 @@ public class TradeRepublicAdapter implements TradeRepublicPort {
                                                     // almost always falls through to the default. LSX (Lang &
                                                     // Schwarz Exchange) is TR's home exchange for equities/ETFs
                                                     // — see GH issue #23 (all ticker subs were FORBIDDEN with TRX).
-                                                    // TR-native crypto (isin starting "XF000", e.g. XF000BTC0017)
-                                                    // is priced on TRD0 instead — LSX doesn't list it, so using
-                                                    // LSX here would still leave every crypto position FORBIDDEN
-                                                    // and silently falling back to averageBuyIn.
+                                                    // TR-native crypto (see OpenFigiIsinConverter.isTrCryptoIsin,
+                                                    // e.g. XF000BTC0017) is priced on TRD0 instead — LSX doesn't
+                                                    // list it, so using LSX here would still leave every crypto
+                                                    // position FORBIDDEN and silently falling back to averageBuyIn.
                                                     String exchangeId = pos.path("exchangeId").asText("");
-                                                    String defaultExchange = isin.startsWith("XF000") ? "TRD0" : "LSX";
+                                                    String defaultExchange =
+                                                            OpenFigiIsinConverter.isTrCryptoIsin(isin) ? "TRD0" : "LSX";
                                                     String tickerId = isin + "." + (exchangeId.isEmpty() ? defaultExchange : exchangeId);
                                                     tickerMsgs.add(subWithId(tid, "ticker",
                                                             tickerId, sessionToken));
