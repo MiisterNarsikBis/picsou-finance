@@ -59,6 +59,19 @@ class ManualTransactionServiceTest {
             .build();
     }
 
+    /** Manual annotation (id 7) living on a synced account — shared by the update/delete guard tests. */
+    private Transaction syncedManualTransaction(Account account) {
+        return Transaction.builder()
+            .id(7L)
+            .account(account)
+            .date(LocalDate.of(2024, 5, 21))
+            .description("Manual annotation on synced account")
+            .amount(new BigDecimal("-10"))
+            .isManual(true)
+            .nativeCurrency("EUR")
+            .build();
+    }
+
     private Account peaAccount() {
         return Account.builder()
             .id(2L)
@@ -124,15 +137,7 @@ class ManualTransactionServiceTest {
     @Test
     void updateTransaction_syncedAccount_doesNotRewriteBalanceOrSnapshots() {
         Account account = syncedCheckingAccount();
-        Transaction tx = Transaction.builder()
-            .id(7L)
-            .account(account)
-            .date(LocalDate.of(2024, 5, 21))
-            .description("Manual annotation on synced account")
-            .amount(new BigDecimal("-10"))
-            .isManual(true)
-            .nativeCurrency("EUR")
-            .build();
+        Transaction tx = syncedManualTransaction(account);
         TransactionRequest req = new TransactionRequest(
             LocalDate.of(2024, 5, 22),
             "Corrected annotation",
@@ -158,15 +163,7 @@ class ManualTransactionServiceTest {
     @Test
     void deleteTransaction_syncedAccount_doesNotReconstruct() {
         Account account = syncedCheckingAccount();
-        Transaction tx = Transaction.builder()
-            .id(7L)
-            .account(account)
-            .date(LocalDate.of(2024, 5, 21))
-            .description("Manual annotation on synced account")
-            .amount(new BigDecimal("-10"))
-            .isManual(true)
-            .nativeCurrency("EUR")
-            .build();
+        Transaction tx = syncedManualTransaction(account);
 
         when(accountRepository.findByIdAndMemberId(3L, 10L)).thenReturn(Optional.of(account));
         when(transactionRepository.findByIdAndAccountId(7L, 3L)).thenReturn(Optional.of(tx));
