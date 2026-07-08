@@ -53,7 +53,7 @@ spring:
         stdio: false
         type: SYNC
         name: picsou
-        version: 1.0.8
+        version: ${APP_VERSION:dev}
         instructions: >-
           Picsou personal-finance MCP server. Every tool operates only on the financial data of
           the member who owns the access-key used to authenticate: it can never read or modify
@@ -94,6 +94,11 @@ management:
   endpoint:
     health:
       show-details: never
+
+info:
+  app:
+    name: picsou
+    version: ${APP_VERSION:dev}
 
 app:
   admin-recovery:
