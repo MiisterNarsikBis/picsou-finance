@@ -75,7 +75,7 @@ class GoalServiceTest {
                 null, true, "#6366f1", null, null, null, null, null
             )
         );
-        when(accountService.liveBalanceEur(account)).thenReturn(new BigDecimal("5000"));
+        when(accountService.signedLiveBalanceEur(account)).thenReturn(new BigDecimal("5000"));
         when(snapshotRepository.findRecentByAccountId(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.any()
@@ -96,6 +96,66 @@ class GoalServiceTest {
         assertThat(progress.monthlyNeeded()).isEqualByComparingTo(
             new BigDecimal("15000").divide(BigDecimal.valueOf(monthsLeft), 2, RoundingMode.HALF_UP));
         assertThat(progress.percentComplete()).isEqualByComparingTo("25.0000");
+    }
+
+    @Test
+    void progressCalculation_linkedLoan_countsNegatively() {
+        Account asset = Account.builder()
+            .id(1L)
+            .name("LEP")
+            .type(AccountType.LEP)
+            .currency("EUR")
+            .currentBalance(new BigDecimal("5000"))
+            .color("#6366f1")
+            .build();
+        Account loan = Account.builder()
+            .id(2L)
+            .name("Prêt")
+            .type(AccountType.LOAN)
+            .currency("EUR")
+            .currentBalance(new BigDecimal("2000"))
+            .color("#ef4444")
+            .build();
+
+        Goal goal = Goal.builder()
+            .id(1L)
+            .name("Apport net")
+            .targetAmount(new BigDecimal("20000"))
+            .deadline(LocalDate.now().plusMonths(6))
+            .accounts(List.of(asset, loan))
+            .build();
+
+        when(accountService.toResponse(asset)).thenReturn(
+            new com.picsou.dto.AccountResponse(
+                1L, "LEP", AccountType.LEP, null, "EUR",
+                new BigDecimal("5000"), new BigDecimal("5000"),
+                null, true, "#6366f1", null, null, null, null, null
+            )
+        );
+        when(accountService.toResponse(loan)).thenReturn(
+            new com.picsou.dto.AccountResponse(
+                2L, "Prêt", AccountType.LOAN, null, "EUR",
+                new BigDecimal("2000"), new BigDecimal("2000"),
+                null, true, "#ef4444", null, null, null, null, null
+            )
+        );
+        when(accountService.signedLiveBalanceEur(asset)).thenReturn(new BigDecimal("5000"));
+        // LOAN: the signed helper returns the outstanding debt as a NEGATIVE value.
+        when(accountService.signedLiveBalanceEur(loan)).thenReturn(new BigDecimal("-2000"));
+        when(snapshotRepository.findRecentByAccountId(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        )).thenReturn(List.of());
+
+        GoalProgressResponse progress = goalService.toProgressResponse(goal);
+
+        // 5000 − 2000: the linked loan reduces goal progress.
+        assertThat(progress.currentTotal()).isEqualByComparingTo("3000");
+        long monthsLeft = progress.monthsLeft();
+        assertThat(monthsLeft).isIn(5L, 6L);
+        // monthlyNeeded derives from the netted total: (20000 − 3000) / monthsLeft.
+        assertThat(progress.monthlyNeeded()).isEqualByComparingTo(
+            new BigDecimal("17000").divide(BigDecimal.valueOf(monthsLeft), 2, RoundingMode.HALF_UP));
     }
 
     // ─── IDOR regression (GHSA security audit 2026-06-27) ──────────────────────
@@ -242,7 +302,7 @@ class GoalServiceTest {
                 null, true, "#000", null, null, null, null, null
             )
         );
-        when(accountService.liveBalanceEur(account)).thenReturn(BigDecimal.ZERO);
+        when(accountService.signedLiveBalanceEur(account)).thenReturn(BigDecimal.ZERO);
         when(snapshotRepository.findRecentByAccountId(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.any()
@@ -301,7 +361,7 @@ class GoalServiceTest {
                 null, true, "#000", null, null, null, null, null
             )
         );
-        when(accountService.liveBalanceEur(account)).thenReturn(BigDecimal.ZERO);
+        when(accountService.signedLiveBalanceEur(account)).thenReturn(BigDecimal.ZERO);
         when(snapshotRepository.findRecentByAccountId(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.any()
@@ -347,7 +407,7 @@ class GoalServiceTest {
                 null, true, "#000", null, null, null, null, null
             )
         );
-        when(accountService.liveBalanceEur(account)).thenReturn(BigDecimal.ZERO);
+        when(accountService.signedLiveBalanceEur(account)).thenReturn(BigDecimal.ZERO);
         when(snapshotRepository.findRecentByAccountId(
             org.mockito.ArgumentMatchers.eq(1L),
             org.mockito.ArgumentMatchers.any()

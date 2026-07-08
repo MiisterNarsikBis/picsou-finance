@@ -128,9 +128,10 @@ public class GoalService {
             .map(accountService::toResponse)
             .toList();
 
-        // Use live balance (with PnL from current prices) for each account
+        // Use live balance (with PnL from current prices) for each account.
+        // Signed: linked LOAN accounts count negatively against the goal.
         BigDecimal currentTotal = goal.getAccounts().stream()
-            .map(accountService::liveBalanceEur)
+            .map(accountService::signedLiveBalanceEur)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal target = goal.getTargetAmount();
