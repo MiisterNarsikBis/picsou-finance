@@ -374,11 +374,19 @@ public class HistoryService {
         BigDecimal valueAtFrom = BigDecimal.ZERO;
         BigDecimal liveMatchedValue = BigDecimal.ZERO;
         int matchedPrices = 0;
+        // Same ticker can appear across several accounts — look each price up once.
+        Map<String, Optional<PriceSnapshot>> snapByTicker = new HashMap<>();
+        Map<String, BigDecimal> livePriceByTicker = new HashMap<>();
         for (AccountHolding h : allHoldings) {
-            if (h.getTicker() == null) continue;
-            Optional<PriceSnapshot> snap = priceSnapshotRepository.findLatestByTickerBeforeOrOnDate(h.getTicker(), fromDate);
+            String ticker = h.getTicker();
+            if (ticker == null) continue;
+            Optional<PriceSnapshot> snap = snapByTicker.computeIfAbsent(ticker,
+                t -> priceSnapshotRepository.findLatestByTickerBeforeOrOnDate(t, fromDate));
             if (snap.isEmpty()) continue;
-            BigDecimal livePrice = priceService.getPriceEur(h.getTicker());
+            if (!livePriceByTicker.containsKey(ticker)) {
+                livePriceByTicker.put(ticker, priceService.getPriceEur(ticker));
+            }
+            BigDecimal livePrice = livePriceByTicker.get(ticker);
             if (livePrice == null) continue;
             valueAtFrom = valueAtFrom.add(h.getQuantity().multiply(snap.get().getPriceEur()));
             liveMatchedValue = liveMatchedValue.add(h.getQuantity().multiply(livePrice));
