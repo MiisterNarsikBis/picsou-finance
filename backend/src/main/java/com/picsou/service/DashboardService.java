@@ -32,6 +32,7 @@ public class DashboardService {
     private final PriceService priceService;
     private final AccountHoldingRepository holdingRepository;
     private final HistoryService historyService;
+    private final AccountService accountService;
 
     public DashboardService(
         AccountRepository accountRepository,
@@ -39,7 +40,8 @@ public class DashboardService {
         GoalRepository goalRepository,
         PriceService priceService,
         AccountHoldingRepository holdingRepository,
-        HistoryService historyService
+        HistoryService historyService,
+        AccountService accountService
     ) {
         this.accountRepository = accountRepository;
         this.goalService = goalService;
@@ -47,6 +49,7 @@ public class DashboardService {
         this.priceService = priceService;
         this.holdingRepository = holdingRepository;
         this.historyService = historyService;
+        this.accountService = accountService;
     }
 
     public DashboardResponse getDashboard(Long memberId, String range) {
@@ -69,7 +72,13 @@ public class DashboardService {
             BigDecimal accountValue;
             BigDecimal accountInvested;
 
-            if (holdings.isEmpty()) {
+            if (account.getType() == AccountType.LOAN) {
+                // Same valuation source as HistoryService's live point: amortized
+                // remaining capital when a Debt row exists, stored balance otherwise.
+                // Keeps the hero's liabilities consistent with the chart's today point.
+                accountValue = accountService.liveBalanceEur(account);
+                accountInvested = BigDecimal.ZERO;
+            } else if (holdings.isEmpty()) {
                 accountValue = priceService.toEur(account.getCurrentBalance(), account.getCurrency(), account.getTicker());
                 accountInvested = accountValue;
             } else {
@@ -135,7 +144,10 @@ public class DashboardService {
 
             List<AccountHolding> holdings = holdingsByAccount.getOrDefault(account.getId(), List.of());
             BigDecimal balanceEur;
-            if (holdings.isEmpty()) {
+            if (isLoan) {
+                // Keep liability rows on the same valuation as the totals above.
+                balanceEur = accountService.liveBalanceEur(account);
+            } else if (holdings.isEmpty()) {
                 balanceEur = priceService.toEur(account.getCurrentBalance(), account.getCurrency(), account.getTicker());
             } else {
                 balanceEur = BigDecimal.ZERO;

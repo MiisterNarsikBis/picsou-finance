@@ -29,6 +29,7 @@ class DashboardServiceTest {
     @Mock PriceService priceService;
     @Mock AccountHoldingRepository holdingRepository;
     @Mock HistoryService historyService;
+    @Mock AccountService accountService;
 
     @InjectMocks DashboardService dashboardService;
 
@@ -131,7 +132,7 @@ class DashboardServiceTest {
         when(holdingRepository.findByAccount_Id(10L)).thenReturn(List.of());
         when(priceService.toEur(new BigDecimal("2000"), "EUR", null)).thenReturn(new BigDecimal("2000"));
         when(priceService.toEur(new BigDecimal("6000"), "EUR", null)).thenReturn(new BigDecimal("6000"));
-        when(priceService.toEur(new BigDecimal("10000"), "EUR", null)).thenReturn(new BigDecimal("10000"));
+        when(accountService.liveBalanceEur(loanAcc)).thenReturn(new BigDecimal("10000"));
         when(historyService.buildHistory(List.of(1L, 2L, 10L), 12, 42L)).thenReturn(List.of());
         when(goalRepository.findAllByMemberIdOrderByCreatedAtAsc(42L)).thenReturn(List.of());
 
@@ -143,6 +144,28 @@ class DashboardServiceTest {
             .extracting(DashboardResponse.DistributionItem::percentage)
             .containsExactly(25.0, 75.0);
         assertThat(response.liabilities().getFirst().percentage()).isEqualTo(100.0);
+    }
+
+    @Test
+    void getDashboard_loanValuation_usesAmortizedLiveBalance_notStoredBalance() {
+        Account loanAcc = loanAccount();               // stored balance 10000
+        Account cashAcc = cashAccount();
+        when(accountRepository.findAllByMemberIdOrderByCreatedAtAsc(42L)).thenReturn(List.of(loanAcc, cashAcc));
+        when(holdingRepository.findByAccount_Id(10L)).thenReturn(List.of());
+        when(holdingRepository.findByAccount_Id(1L)).thenReturn(List.of());
+        // Amortization has progressed: remaining capital 9500 < stored 10000.
+        when(accountService.liveBalanceEur(loanAcc)).thenReturn(new BigDecimal("9500"));
+        when(priceService.toEur(new BigDecimal("2000"), "EUR", null)).thenReturn(new BigDecimal("2000"));
+        when(historyService.buildHistory(List.of(10L, 1L), 12, 42L)).thenReturn(List.of());
+        when(goalRepository.findAllByMemberIdOrderByCreatedAtAsc(42L)).thenReturn(List.of());
+
+        DashboardResponse response = dashboardService.getDashboard(42L, "1Y");
+
+        // Hero totals and the liability row both use the amortized value, matching
+        // what HistoryService's live point reports for the same loan.
+        assertThat(response.totalLiabilities()).isEqualByComparingTo("9500");
+        assertThat(response.totalNetWorth()).isEqualByComparingTo("-7500");
+        assertThat(response.liabilities().getFirst().balanceEur()).isEqualByComparingTo("9500");
     }
 
     @Test
@@ -167,7 +190,9 @@ class DashboardServiceTest {
         when(accountRepository.findAllByMemberIdOrderByCreatedAtAsc(42L)).thenReturn(List.of(loanAcc, cashAcc));
         when(holdingRepository.findByAccount_Id(10L)).thenReturn(List.of());
         when(holdingRepository.findByAccount_Id(1L)).thenReturn(List.of());
-        when(priceService.toEur(new BigDecimal("10000"), "EUR", null)).thenReturn(new BigDecimal("10000"));
+        // Loans are valued through AccountService.liveBalanceEur (amortized when a Debt
+        // row exists), not through the raw stored-balance conversion.
+        when(accountService.liveBalanceEur(loanAcc)).thenReturn(new BigDecimal("10000"));
         when(priceService.toEur(new BigDecimal("2000"), "EUR", null)).thenReturn(new BigDecimal("2000"));
         when(historyService.buildHistory(List.of(10L, 1L), 12, 42L)).thenReturn(List.of());
         when(goalRepository.findAllByMemberIdOrderByCreatedAtAsc(42L)).thenReturn(List.of());
