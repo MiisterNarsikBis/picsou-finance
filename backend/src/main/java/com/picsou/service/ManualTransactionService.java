@@ -53,7 +53,10 @@ public class ManualTransactionService {
 
         if (INVESTMENT_TYPES.contains(account.getType())) {
             holdingComputeService.recomputeHoldings(account);
-        } else {
+        // Synced accounts (bank/TR/wallet/exchange) own their balance & snapshot history
+        // via their provider sync; rebuilding from manual transactions would overwrite
+        // the balance and delete the provider-written snapshots.
+        } else if (account.isManual()) {
             recomputeCashBalance(account);
             finaryPersistenceHelper.reconstructSnapshotsFromDb(account);
         }
@@ -85,7 +88,7 @@ public class ManualTransactionService {
 
         if (INVESTMENT_TYPES.contains(account.getType())) {
             holdingComputeService.recomputeHoldings(account);
-        } else {
+        } else if (account.isManual()) {
             recomputeCashBalance(account);
             finaryPersistenceHelper.reconstructSnapshotsFromDb(account);
         }
@@ -109,7 +112,7 @@ public class ManualTransactionService {
 
         if (INVESTMENT_TYPES.contains(account.getType())) {
             holdingComputeService.recomputeHoldings(account);
-        } else {
+        } else if (account.isManual()) {
             recomputeCashBalance(account);
             finaryPersistenceHelper.reconstructSnapshotsFromDb(account);
         }

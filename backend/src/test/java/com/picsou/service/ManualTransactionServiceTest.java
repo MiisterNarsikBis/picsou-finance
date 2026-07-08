@@ -44,6 +44,18 @@ class ManualTransactionServiceTest {
             .type(AccountType.CHECKING)
             .currency("EUR")
             .currentBalance(BigDecimal.ZERO)
+            .isManual(true)
+            .build();
+    }
+
+    private Account syncedCheckingAccount() {
+        return Account.builder()
+            .id(3L)
+            .name("Bank-synced Checking")
+            .type(AccountType.CHECKING)
+            .currency("EUR")
+            .currentBalance(new BigDecimal("2500"))
+            .isManual(false)
             .build();
     }
 
@@ -58,7 +70,7 @@ class ManualTransactionServiceTest {
     }
 
     @Test
-    void addTransaction_cashAccount_recomputesBalance() {
+    void addTransaction_manualCashAccount_recomputesBalanceAndSnapshots() {
         Account account = checkingAccount();
         TransactionRequest req = new TransactionRequest(
             LocalDate.of(2024, 1, 15),
@@ -80,6 +92,58 @@ class ManualTransactionServiceTest {
         verify(accountRepository).save(account);
         verify(holdingComputeService, never()).recomputeHoldings(any());
         verify(finaryPersistenceHelper).reconstructSnapshotsFromDb(account);
+    }
+
+    @Test
+    void addTransaction_syncedCashAccount_savesTransactionButLeavesBalanceAndSnapshots() {
+        Account account = syncedCheckingAccount();
+        TransactionRequest req = new TransactionRequest(
+            LocalDate.of(2024, 5, 20),
+            "Cash expense noted by hand",
+            new BigDecimal("-10"),
+            TransactionType.WITHDRAWAL,
+            null, null, null, null, "EUR"
+        );
+
+        when(accountRepository.findByIdAndMemberId(3L, 10L)).thenReturn(Optional.of(account));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TransactionResponse result = manualTransactionService.addTransaction(3L, 10L, req);
+
+        // The annotation is recorded...
+        assertThat(result).isNotNull();
+        assertThat(result.amount()).isEqualByComparingTo("-10");
+        verify(transactionRepository).save(any(Transaction.class));
+        // ...but the provider-owned balance and snapshot history are untouched.
+        assertThat(account.getCurrentBalance()).isEqualByComparingTo("2500");
+        verify(transactionRepository, never()).sumAmountByAccountId(any());
+        verify(accountRepository, never()).save(any());
+        verify(finaryPersistenceHelper, never()).reconstructSnapshotsFromDb(any());
+    }
+
+    @Test
+    void deleteTransaction_syncedAccount_doesNotReconstruct() {
+        Account account = syncedCheckingAccount();
+        Transaction tx = Transaction.builder()
+            .id(7L)
+            .account(account)
+            .date(LocalDate.of(2024, 5, 21))
+            .description("Manual annotation on synced account")
+            .amount(new BigDecimal("-10"))
+            .isManual(true)
+            .nativeCurrency("EUR")
+            .build();
+
+        when(accountRepository.findByIdAndMemberId(3L, 10L)).thenReturn(Optional.of(account));
+        when(transactionRepository.findByIdAndAccountId(7L, 3L)).thenReturn(Optional.of(tx));
+
+        manualTransactionService.deleteTransaction(3L, 7L, 10L);
+
+        verify(transactionRepository).delete(tx);
+        assertThat(account.getCurrentBalance()).isEqualByComparingTo("2500");
+        verify(transactionRepository, never()).sumAmountByAccountId(any());
+        verify(accountRepository, never()).save(any());
+        verify(finaryPersistenceHelper, never()).reconstructSnapshotsFromDb(any());
     }
 
     @Test
@@ -107,6 +171,39 @@ class ManualTransactionServiceTest {
         verify(holdingComputeService).recomputeHoldings(account);
         verify(finaryPersistenceHelper, never()).reconstructSnapshotsFromDb(any());
         verify(transactionRepository, never()).sumAmountByAccountId(any());
+    }
+
+    @Test
+    void addTransaction_syncedInvestmentAccount_stillRecomputesHoldings() {
+        Account account = Account.builder()
+            .id(4L)
+            .name("Synced CTO")
+            .type(AccountType.COMPTE_TITRES)
+            .currency("EUR")
+            .currentBalance(BigDecimal.ZERO)
+            .isManual(false)
+            .build();
+        TransactionRequest req = new TransactionRequest(
+            LocalDate.of(2024, 4, 2),
+            "Buy AAPL",
+            new BigDecimal("-500"),
+            TransactionType.BUY,
+            "AAPL",
+            null,
+            new BigDecimal("5"),
+            new BigDecimal("100"),
+            "EUR"
+        );
+
+        when(accountRepository.findByIdAndMemberId(4L, 10L)).thenReturn(Optional.of(account));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        manualTransactionService.addTransaction(4L, 10L, req);
+
+        // The isManual guard only gates the cash recompute path — holdings
+        // derivation runs for investment accounts regardless of provenance.
+        verify(holdingComputeService).recomputeHoldings(account);
+        verify(finaryPersistenceHelper, never()).reconstructSnapshotsFromDb(any());
     }
 
     @Test
