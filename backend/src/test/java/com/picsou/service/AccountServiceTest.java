@@ -195,4 +195,37 @@ class AccountServiceTest {
 
         assertThat(result).isEqualByComparingTo("2300");
     }
+
+    // ─── signedLiveBalanceEur ─────────────────────────────────────────────────
+
+    @Test
+    void signedLiveBalanceEur_loan_returnsNegativeOutstanding() {
+        Account loan = loanAccount();
+        Debt debt = Debt.builder().build();
+        when(debtRepository.findByAccountId(1L)).thenReturn(Optional.of(debt));
+        when(loanAmortizationService.computeRemainingBalance(eq(debt), any(LocalDate.class)))
+            .thenReturn(new BigDecimal("8500"));
+
+        BigDecimal result = accountService.signedLiveBalanceEur(loan);
+
+        // LOAN accounts are stored positive; the signed helper applies the liability sign.
+        assertThat(result).isEqualByComparingTo("-8500");
+    }
+
+    @Test
+    void signedLiveBalanceEur_checking_returnsBalanceUnchanged() {
+        Account cash = Account.builder()
+            .id(2L)
+            .name("Checking")
+            .type(AccountType.CHECKING)
+            .currency("EUR")
+            .currentBalance(new BigDecimal("2500"))
+            .build();
+        when(holdingRepository.findByAccount_Id(2L)).thenReturn(List.of());
+        when(priceService.toEur(new BigDecimal("2500"), "EUR", null)).thenReturn(new BigDecimal("2500"));
+
+        BigDecimal result = accountService.signedLiveBalanceEur(cash);
+
+        assertThat(result).isEqualByComparingTo("2500");
+    }
 }
