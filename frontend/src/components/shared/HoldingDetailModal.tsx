@@ -54,11 +54,17 @@ export function HoldingDetailModal({ line, onClose }: HoldingDetailModalProps) {
 
   const history = useMemo(() => {
     if (!rawHistory) return []
-    return rawHistory.map(p => ({
-      date: p.date,
-      total: mode === 'holding' && line ? p.priceEur * line.quantity : p.priceEur,
-      ...(investedRef !== undefined ? { invested: investedRef } : {}),
-    }))
+    return rawHistory.map(p => {
+      const total = mode === 'holding' && line ? p.priceEur * line.quantity : p.priceEur
+      return {
+        date: p.date,
+        total,
+        // For a pure holding, value − cost basis IS its debt-free investment
+        // pnl — emit it so the chart tooltip keeps its gain/loss row (the
+        // tooltip reads `pnl` and never recomputes total − invested).
+        ...(investedRef !== undefined ? { invested: investedRef, pnl: total - investedRef } : {}),
+      }
+    })
   }, [rawHistory, mode, line, investedRef])
 
   const intraday = useMemo(() => {

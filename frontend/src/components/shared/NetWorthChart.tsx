@@ -38,7 +38,7 @@ interface NetWorthChartProps {
   todayLabel?: string
 }
 
-function NetWorthTooltip({ active, payload, labels, is24H }: {
+function NetWorthTooltip({ active, payload, labels, is24H, showGainLoss }: {
   active?: boolean
   payload?: Array<{
     value: number
@@ -47,6 +47,9 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
   }>
   labels: { total: string; invested: string; target: string; projection: string; gainLoss: string; locale: string; currency: string }
   is24H: boolean
+  // Callers that hide investment info (showInvested={false}, e.g. goal charts)
+  // must not surface a gain/loss row either.
+  showGainLoss: boolean
 }) {
   if (!active || !payload?.length) return null
 
@@ -126,7 +129,7 @@ function NetWorthTooltip({ active, payload, labels, is24H }: {
           </span>
         </div>
       )}
-      {gainLoss !== null && (
+      {showGainLoss && gainLoss !== null && (
         <>
           <div className="my-1.5 border-t border-border" />
           <div className="flex items-center justify-between gap-3 py-0.5">
@@ -387,7 +390,7 @@ export function NetWorthChart({ data, intraday = [], range, onRangeChange, showI
           width={45}
           tickCount={5}
         />
-        <ChartTooltip content={<NetWorthTooltip labels={labels} is24H={is24H} />} />
+        <ChartTooltip content={<NetWorthTooltip labels={labels} is24H={is24H} showGainLoss={showInvested} />} />
         <Area
           dataKey="total"
           type="monotone"
