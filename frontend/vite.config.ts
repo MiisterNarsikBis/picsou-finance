@@ -14,7 +14,18 @@ const localHttps =
       }
     : undefined
 
+interface PackageJson {
+  version: string
+}
+
+const packageJsonPath = path.resolve(__dirname, 'package.json')
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as PackageJson
+const appVersion = process.env.VITE_APP_VERSION ?? packageJson.version
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

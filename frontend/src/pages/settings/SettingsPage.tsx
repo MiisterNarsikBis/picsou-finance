@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import { APP_VERSION } from '@/lib/app-version'
 import { SecuritySection } from './security/SecuritySection'
 import { AccessKeysSection } from './sections/AccessKeysSection'
 
@@ -352,7 +353,7 @@ export function SettingsPage() {
             <p className="text-muted-foreground">
               {t('settings.version')}
             </p>
-            <p className="font-medium text-foreground">1.0.8</p>
+            <p className="font-medium text-foreground">{APP_VERSION}</p>
           </div>
           <div className="space-y-1 sm:justify-self-end sm:text-right">
             <p className="text-muted-foreground">GitHub</p>
