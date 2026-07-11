@@ -127,7 +127,14 @@
     "recentAccounts": "Comptes récents",
     "viewAll": "Voir tout",
     "totalLiabilities": "Total des dettes",
-    "totalAssets": "Total des actifs"
+    "totalAssets": "Total des actifs",
+    "evolution": {
+      "net": "Évolution du patrimoine net",
+      "gross": "Évolution du patrimoine brut",
+      "financial": "Évolution du patrimoine financier"
+    },
+    "liabilitiesTitle": "Passifs",
+    "liabilitiesDescription": "Dette restante par compte"
   },
   "accounts": {
     "title": "Comptes",

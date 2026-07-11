@@ -1,6 +1,6 @@
 # Feature: Manual Transactions
 
-> Last updated: 2026-06-03
+> Last updated: 2026-07-08
 
 ## Context
 
@@ -55,7 +55,11 @@ A user-supplied "Nom" always wins over the resolved name. The same logic runs fo
 
 ### Balance derivation (cash accounts)
 
-When a manual transaction is added or deleted on a cash account, `ManualTransactionService` recomputes `account.currentBalance` as the sum of all transaction amounts via a single aggregate query (`sumAmountByAccountId`). It then calls `FinaryPersistenceHelper.reconstructSnapshotsFromDb()` to rebuild the balance history from scratch.
+When a manual transaction is added, edited, or deleted on a **manual** cash account (`account.isManual = true`), `ManualTransactionService` recomputes `account.currentBalance` as the sum of all transaction amounts via a single aggregate query (`sumAmountByAccountId`). It then calls `FinaryPersistenceHelper.reconstructSnapshotsFromDb()` to rebuild the balance history from scratch.
+
+### Synced accounts
+
+Manual transactions on a **synced** cash account (`account.isManual = false` — bank-synced via Enable Banking, Trade Republic, wallet, or exchange accounts) are recorded but never drive the account's balance or snapshot history. Only `isManual` accounts get transaction-derived balances; for synced accounts the balance and snapshots are owned by the provider sync, and rebuilding them from the (usually sparse) manual transaction list would overwrite the balance and delete the provider-written snapshot history. Finary-created accounts have `isManual = true`, so they keep the transaction-derived path. Investment accounts are unaffected: `recomputeHoldings` runs after every manual BUY/SELL regardless of account provenance. The MCP `add_transaction` tool goes through the same service, so it inherits the rule.
 
 ### Holdings derivation (investment accounts)
 
@@ -133,5 +137,5 @@ After submit, `useAddTransaction` / `useDeleteTransaction` hooks invalidate the 
 ## Tests
 
 - `HoldingComputeServiceTest` — 11 unit tests: BUY-only, multi-BUY VWAP, BUY+SELL, fully-sold position, null ticker/quantity skipping, multiple tickers, existing holding update, plus position name = newest transaction's name and name-preserved-when-transactions-have-none.
-- `ManualTransactionServiceTest` — 8 unit tests: cash add, investment add (holdings recomputed), non-owned account rejection, manual delete, synced-transaction delete rejection, not-found rejection, plus ISIN input → resolved ticker/name/description and plain-ticker uppercased with the user "Nom" winning.
+- `ManualTransactionServiceTest` — 11 unit tests: manual cash add (balance + snapshots recomputed), synced cash add (transaction saved, balance/snapshots untouched), investment add (holdings recomputed, for both manual and synced accounts), non-owned account rejection, manual delete, synced-account delete (no reconstruct), synced-transaction delete rejection, not-found rejection, plus ISIN input → resolved ticker/name/description and plain-ticker uppercased with the user "Nom" winning.
 - `OpenFigiIsinConverterTest` — 4 unit tests for the `isIsin()` detector: valid ISINs, case/whitespace normalization, rejects tickers/non-ISIN strings, rejects null/blank.

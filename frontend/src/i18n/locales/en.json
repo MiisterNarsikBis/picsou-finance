@@ -127,7 +127,14 @@
     "recentAccounts": "Recent accounts",
     "viewAll": "View all",
     "totalLiabilities": "Total liabilities",
-    "totalAssets": "Total assets"
+    "totalAssets": "Total assets",
+    "evolution": {
+      "net": "Net worth evolution",
+      "gross": "Gross assets evolution",
+      "financial": "Financial assets evolution"
+    },
+    "liabilitiesTitle": "Liabilities",
+    "liabilitiesDescription": "Outstanding debt by account"
   },
   "accounts": {
     "title": "Accounts",

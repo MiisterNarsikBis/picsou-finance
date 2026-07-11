@@ -51,12 +51,7 @@ public class ManualTransactionService {
 
         transactionRepository.save(tx);
 
-        if (INVESTMENT_TYPES.contains(account.getType())) {
-            holdingComputeService.recomputeHoldings(account);
-        } else {
-            recomputeCashBalance(account);
-            finaryPersistenceHelper.reconstructSnapshotsFromDb(account);
-        }
+        recomputeDerivedState(account);
 
         return TransactionResponse.from(tx);
     }
@@ -83,12 +78,7 @@ public class ManualTransactionService {
         applyInstrumentFields(tx, req);
         transactionRepository.save(tx);
 
-        if (INVESTMENT_TYPES.contains(account.getType())) {
-            holdingComputeService.recomputeHoldings(account);
-        } else {
-            recomputeCashBalance(account);
-            finaryPersistenceHelper.reconstructSnapshotsFromDb(account);
-        }
+        recomputeDerivedState(account);
 
         return TransactionResponse.from(tx);
     }
@@ -107,9 +97,21 @@ public class ManualTransactionService {
 
         transactionRepository.delete(tx);
 
+        recomputeDerivedState(account);
+    }
+
+    /**
+     * Recomputes derived state after a manual transaction is added, edited, or deleted.
+     * Investment accounts always recompute holdings. For other account types, the cash
+     * balance and snapshot history are only rebuilt for manual accounts — synced accounts
+     * (bank/TR/wallet/exchange) own their balance & snapshot history via provider sync,
+     * and rebuilding from manual transactions would overwrite the balance and delete the
+     * provider-written snapshots.
+     */
+    private void recomputeDerivedState(Account account) {
         if (INVESTMENT_TYPES.contains(account.getType())) {
             holdingComputeService.recomputeHoldings(account);
-        } else {
+        } else if (account.isManual()) {
             recomputeCashBalance(account);
             finaryPersistenceHelper.reconstructSnapshotsFromDb(account);
         }
