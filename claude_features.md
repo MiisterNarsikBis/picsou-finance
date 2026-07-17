@@ -1,70 +1,74 @@
 # claude_features.md
 
-Claude Code features that are relevant to Picsou, and the custom subagents configured for this
-repository. Companion to `CLAUDE.md` / `AGENTS.md` (project/stack guidance) — this file is about
-the *tooling* layered on top, not the product.
+Idées de fonctionnalités pour Picsou — pistes à explorer, pas un engagement de roadmap. Chaque
+idée indique pourquoi elle serait utile et comment elle s'appuierait sur l'architecture existante
+(voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/INDEX.md`](docs/INDEX.md) pour
+l'existant avant de démarrer une de ces pistes — certaines touchent des zones déjà couvertes par
+une ADR).
 
-## Already in use in this repo
+## 1. Budgets par catégorie avec alertes de dépassement
 
-- **`CLAUDE.md` hierarchy** — root `CLAUDE.md` + `backend/CLAUDE.md` + `frontend/CLAUDE.md` give
-  Claude Code scoped context automatically depending on which part of the codebase is touched.
-- **`.claude/commands/`** — three custom slash commands already exist and encode this project's
-  documentation workflow:
-  - `/document` — write or update a `docs/features/*.md` note for the feature just worked on.
-  - `/decision` — record a new ADR in `docs/decisions/` from the current conversation.
-  - `/coherence` — read-only audit of the whole `docs/` tree against the actual codebase (dead
-    links, stale commands, version drift, missing env vars, index completeness).
+Aujourd'hui Picsou suit les objectifs d'épargne (`goals`) et le patrimoine, mais pas un budget
+mensuel par poste de dépense (courses, transport, loisirs...). Ajouter des enveloppes budgétaires
+par catégorie, avec une alerte quand une catégorie dépasse son plafond en cours de mois.
+S'appuierait sur les transactions déjà importées/synchronisées (bancaires + manuelles) et sur le
+`SchedulerService` existant pour le calcul périodique.
 
-  These map directly to the workflow described in `CLAUDE.md`'s "Development workflow" section —
-  the commands exist so that workflow doesn't rely on remembering to do it manually.
+## 2. Détection des abonnements récurrents
 
-## New: subagents (`.claude/agents/`)
+Repérer automatiquement les prélèvements récurrents (Netflix, salle de sport, assurances...) à
+partir de l'historique de transactions, afficher le coût total mensuel des abonnements, et alerter
+en cas de hausse de prix ou d'abonnement "oublié" (aucune activité associée). Un des cas d'usage
+les plus demandés sur ce type d'app — et une bonne matière pour l'assistant IA (idée 4).
 
-Subagents are separate context windows Claude Code can delegate a sub-task to. Unlike the slash
-commands above (which drive documentation), these are review/writing specialists scoped to a
-specific Picsou concern — each one is grounded in the actual convention docs (`docs/conventions/`,
-`docs/CODING_RULES.md`, `docs/decisions/`) rather than generic best practices, so their findings
-cite this repo's actual rules, not textbook advice.
+## 3. Notifications et alertes proactives
 
-| Agent | Use for | Reads |
-|---|---|---|
-| `backend-reviewer` | Reviewing Java/Spring diffs: ports & adapters, member scoping, error handling, DB conventions | `backend/CLAUDE.md`, `api-rest.md`, `error-handling.md`, `database.md` |
-| `frontend-reviewer` | Reviewing React/TS diffs: state layering, React Compiler rules, shadcn theme tokens, i18n | `frontend/CLAUDE.md`, `conventions/frontend.md` |
-| `migration-writer` | Writing new Flyway migrations with correct numbering/naming/constraints | `conventions/database.md` |
-| `security-auditor` | Auditing auth/JWT/2FA/encryption/CORS changes against ADRs and past incidents | `docs/decisions/*`, `docs/lessons/*`, security feature notes |
-| `test-writer` | Writing backend (Mockito/AssertJ) or frontend (Vitest/Playwright) tests in the project's exact style | `conventions/testing.md` |
-| `i18n-sync-checker` | Verifying new UI copy lands in all 4 locale files (fr/en/de/es) and nothing is hardcoded | `docs/features/i18n.md` |
-| `api-contract-guardian` | Keeping `frontend/src/types/api.ts` and `backend/docs/API.md` in sync with backend DTOs | `conventions/api-rest.md` |
-| `adr-prior-art-checker` | Checking `docs/decisions/` and `docs/lessons/` for prior art before a new architectural proposal | `docs/INDEX.md`, `docs/decisions/*` |
+Un canal de notifications (email, ou push si une PWA voit le jour) pour : solde sous un seuil,
+échéance de prêt qui approche, objectif d'épargne en retard sur sa trajectoire, variation
+significative d'un actif crypto/bourse suivi. Actuellement rien n'est poussé vers l'utilisateur en
+dehors du dashboard — tout est "pull". Nécessite un service d'envoi (SMTP déjà probablement présent
+pour d'autres flux à vérifier) et des préférences par membre.
 
-Each is defined with YAML frontmatter (`name`, `description`, `tools`) plus a body that reads like
-a targeted checklist rather than a generic prompt — descriptions are written so Claude Code can
-invoke them **proactively** (e.g. `backend-reviewer` after a controller/service diff,
-`security-auditor` before merging anything auth-related) without being asked by name, and they can
-also be invoked explicitly ("use the migration-writer agent to add the `debt_category` column").
+## 4. Assistant financier conversationnel intégré
 
-Reviewer agents (`backend-reviewer`, `frontend-reviewer`, `security-auditor`,
-`api-contract-guardian`) are intentionally read-only-ish (`Read, Grep, Glob, Bash` — no `Edit`)
-so they report findings rather than silently rewriting code; writer agents (`migration-writer`,
-`test-writer`, `i18n-sync-checker`) carry `Edit`/`Write` because producing the artifact *is* the
-task. `adr-prior-art-checker` has no write tools at all — it's a research step that feeds a human
-decision, not a decision-maker itself.
+Picsou expose déjà un serveur MCP embarqué avec des clés d'accès scopées par membre
+(voir [`docs/features/mcp-server.md`](docs/features/mcp-server.md)) pensé pour des clients MCP
+externes (Claude Desktop, etc.). Une page de chat interne au produit, branchée sur ces mêmes
+outils `@Tool` déjà member-scopés, permettrait de poser des questions en langage naturel
+("combien j'ai dépensé en restaurants ce mois-ci ?") sans dépendre d'une app tierce. Gros levier
+produit, risque architectural faible car la couche outils existe déjà.
 
-## Other Claude Code features worth knowing about for this project
+## 5. Répartition des dépenses communes entre membres du foyer
 
-- **Hooks** (`.claude/settings.json`) — not configured yet. A natural fit here would be a
-  `PreToolUse`/`PostToolUse` hook that runs `bun run lint` after frontend edits or blocks a commit
-  containing a hand-edited file under `frontend/src/components/ui/` (Coding Rule #1 is currently
-  enforced only by convention/review, not tooling).
-- **MCP client** — Claude Code itself can act as an MCP *client*. Worth noting this is distinct
-  from Picsou's own embedded MCP *server* (`docs/features/mcp-server.md`, ADR
-  `2026-06-05-access-key-auth-and-embedded-mcp.md`), which lets external AI apps query a member's
-  finances via `psk_…` access-keys — a Claude Code session working on this repo and an MCP client
-  connecting *to* a running Picsou instance are two unrelated integrations that happen to share a
-  protocol.
-- **Skills** (`skill-creator`, `code-review`, `security-review`, `verify`, `run`) — general-purpose
-  Claude Code skills already available in this environment; `security-review` and `code-review` in
-  particular overlap with `security-auditor`/`backend-reviewer`/`frontend-reviewer` above but run
-  as slash-command-driven passes over a diff rather than as delegatable agents — use whichever fits
-  the moment (a skill for "review my current diff right now", an agent when you want the review to
-  run in its own context alongside other work).
+Le multi-membre existe (`family_member`, `sharing_settings`), mais pour un couple/famille qui
+partage certains comptes, il manque un mécanisme de "qui doit combien à qui" sur les dépenses
+communes (type Tricount) — marquer une dépense comme partagée, définir une clé de répartition, et
+calculer un solde entre membres.
+
+## 6. Rapport patrimonial mensuel automatique
+
+Un digest généré et envoyé (email ou consultable dans l'app) en fin de mois : évolution du
+patrimoine net, comparaison au mois précédent, top variations, progression des objectifs. Combine
+les snapshots de solde déjà calculés quotidiennement (`BalanceSnapshot`) avec un job planifié
+supplémentaire dans `SchedulerService`.
+
+## 7. Simulateur de projection patrimoniale / indépendance financière
+
+Un outil de simulation "et si..." : à ce rythme d'épargne, quand est-ce que je peux couvrir mes
+dépenses avec le patrimoine investi (FIRE), ou combien coûterait un projet (achat immobilier,
+retraite anticipée) compte tenu des flux actuels. S'appuierait sur les mêmes données que
+l'amortissement de prêt déjà calculé à la volée
+([`docs/decisions/2026-04-26-loan-amortization-on-the-fly.md`](docs/decisions/2026-04-26-loan-amortization-on-the-fly.md)).
+
+## 8. Score de santé financière et détection d'anomalies
+
+Un score synthétique (taux d'épargne, diversification, niveau d'endettement, régularité) affiché
+sur le dashboard, plus une détection de transactions inhabituelles (montant ou marchand atypique)
+pour repérer un doublon de prélèvement, une fraude, ou une dépense oubliée. Peut démarrer simple
+(règles statistiques sur l'historique) avant d'envisager un vrai modèle.
+
+---
+
+Avant de lancer l'une de ces pistes : vérifier `docs/decisions/` pour une ADR déjà existante sur
+le sujet, et suivre le workflow "New feature" de `CLAUDE.md` (note de feature + ADR si le choix est
+structurant).
