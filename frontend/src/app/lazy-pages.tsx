@@ -33,6 +33,9 @@ export const GoalsPage = lazy(() =>
 export const GoalCalendarPage = lazy(() =>
   import('@/pages/goals/GoalCalendarPage').then((m) => ({ default: m.GoalCalendarPage }))
 )
+export const SubscriptionsPage = lazy(() =>
+  import('@/pages/subscriptions/SubscriptionsPage').then((m) => ({ default: m.SubscriptionsPage }))
+)
 export const SyncPage = lazy(() =>
   import('@/pages/sync/SyncPage').then((m) => ({ default: m.SyncPage }))
 )

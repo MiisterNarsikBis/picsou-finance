@@ -917,4 +917,45 @@ Returns whether the Finary API credentials (`FINARY_EMAIL`, `FINARY_PASSWORD`) a
 }
 ```
 
+---
+
+### 11. Subscriptions — `/api/subscriptions`
+
+#### `GET /api/subscriptions`
+
+- **Auth:** Required
+
+Detects recurring subscriptions on the fly from the member's outgoing cash transactions (see
+[`docs/features/recurring-subscriptions.md`](../../docs/features/recurring-subscriptions.md)).
+Nothing is persisted — recomputed on every call.
+
+**Response `200` — `SubscriptionsResponse`:**
+```json
+{
+  "totalMonthlyCost": 34.97,
+  "currency": "EUR",
+  "subscriptions": [
+    {
+      "merchant": "PRLV SEPA NETFLIX COM",
+      "category": null,
+      "nativeCurrency": "EUR",
+      "cadence": "MONTHLY",
+      "lastAmount": 12.99,
+      "previousAmount": 9.99,
+      "averageAmount": 10.74,
+      "lastDate": "2026-07-05",
+      "nextExpectedDate": "2026-08-05",
+      "status": "PRICE_INCREASED",
+      "occurrences": 4,
+      "accountId": 3,
+      "accountName": "Compte courant"
+    }
+  ]
+}
+```
+
+`cadence` is one of `WEEKLY`, `MONTHLY`, `YEARLY`. `status` is one of `ACTIVE`, `PRICE_INCREASED`
+(last charge more than 5% above the previous one), `OVERDUE` (no charge seen well past the next
+expected date — takes precedence over `PRICE_INCREASED` when both would apply).
+
 **Response `200` — `FinaryImportResultResponse`** (same shape as file-based import).

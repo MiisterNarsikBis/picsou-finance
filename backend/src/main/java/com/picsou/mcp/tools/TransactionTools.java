@@ -1,5 +1,6 @@
 package com.picsou.mcp.tools;
 
+import com.picsou.dto.SubscriptionsResponse;
 import com.picsou.dto.TransactionRequest;
 import com.picsou.dto.TransactionResponse;
 import com.picsou.mcp.RequiresScope;
@@ -7,6 +8,7 @@ import com.picsou.mcp.Scopes;
 import com.picsou.model.TransactionType;
 import com.picsou.service.AccountService;
 import com.picsou.service.ManualTransactionService;
+import com.picsou.service.RecurringSubscriptionService;
 import com.picsou.service.UserContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -20,20 +22,25 @@ import java.util.List;
  * MCP tools over a member's manual transactions. Reads go through {@link AccountService}, writes
  * through {@link ManualTransactionService} — both already scoped by the member resolved from the
  * authenticated access-key. Only manual transactions are writable; imported/synced transactions
- * are owned by their sync and are not exposed for mutation.
+ * are owned by their sync and are not exposed for mutation. {@code get_subscriptions} exposes the
+ * same on-the-fly recurring-subscription detection as the REST endpoint, gated by the same
+ * {@code transactions:read} scope since it is derived entirely from transaction data.
  */
 @Component
 public class TransactionTools {
 
     private final AccountService accountService;
     private final ManualTransactionService manualTransactionService;
+    private final RecurringSubscriptionService recurringSubscriptionService;
     private final UserContext userContext;
 
     public TransactionTools(AccountService accountService,
                             ManualTransactionService manualTransactionService,
+                            RecurringSubscriptionService recurringSubscriptionService,
                             UserContext userContext) {
         this.accountService = accountService;
         this.manualTransactionService = manualTransactionService;
+        this.recurringSubscriptionService = recurringSubscriptionService;
         this.userContext = userContext;
     }
 
@@ -92,5 +99,15 @@ public class TransactionTools {
         @ToolParam(description = "The transaction id") Long transactionId) {
         manualTransactionService.deleteTransaction(accountId, transactionId, userContext.currentMemberId());
         return "Deleted transaction " + transactionId + " from account " + accountId;
+    }
+
+    @Tool(name = "get_subscriptions",
+        description = "List recurring subscriptions detected from the authenticated member's outgoing "
+            + "cash transactions: merchant, cadence, last/average amount, next expected charge date, "
+            + "and whether the price recently increased or a charge appears overdue. Also returns the "
+            + "estimated total monthly cost.")
+    @RequiresScope(Scopes.TRANSACTIONS_READ)
+    public SubscriptionsResponse getSubscriptions() {
+        return recurringSubscriptionService.detect(userContext.currentMemberId());
     }
 }

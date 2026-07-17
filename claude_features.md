@@ -10,9 +10,10 @@ feature" de `CLAUDE.md` (note de feature + ADR si le choix est structurant).
 1. **Budgets par catégorie avec alertes de dépassement** — enveloppes budgétaires mensuelles par
    poste de dépense (courses, transport, loisirs...), calculées sur les transactions déjà
    synchronisées, avec alerte au dépassement du plafond.
-2. **Détection des abonnements récurrents** — repérer automatiquement les prélèvements récurrents
+2. ✅ **Détection des abonnements récurrents** — repérer automatiquement les prélèvements récurrents
    (streaming, salle de sport, assurances), afficher leur coût total mensuel, alerter en cas de
-   hausse de prix ou d'abonnement "oublié".
+   hausse de prix ou d'abonnement "oublié". *Implémenté le 2026-07-17, voir
+   [`docs/features/recurring-subscriptions.md`](docs/features/recurring-subscriptions.md).*
 3. **Prévision de trésorerie (cash-flow prévisionnel)** — projeter le solde des comptes courants
    sur les 30 prochains jours à partir des prélèvements récurrents et échéances connues (loyer,
    prêt, salaire), pour anticiper un découvert.

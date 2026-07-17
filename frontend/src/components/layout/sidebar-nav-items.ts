@@ -1,9 +1,10 @@
-import { LayoutDashboard, Wallet, Target, Settings } from 'lucide-react'
+import { LayoutDashboard, Wallet, Target, RefreshCcw, Settings } from 'lucide-react'
 
 export const NAV_ITEMS = [
   { path: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard', descKey: 'nav.dashboard.desc' },
   { path: '/accounts', icon: Wallet, labelKey: 'nav.accounts', descKey: 'nav.accounts.desc' },
   { path: '/goals', icon: Target, labelKey: 'nav.goals', descKey: 'nav.goals.desc' },
+  { path: '/subscriptions', icon: RefreshCcw, labelKey: 'nav.subscriptions', descKey: 'nav.subscriptions.desc' },
 ] as const
 
 // The "classic" sidebar style predates the /budget and /family additions and

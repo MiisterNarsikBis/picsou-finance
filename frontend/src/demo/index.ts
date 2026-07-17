@@ -305,6 +305,60 @@ handlers.set(key('DELETE', '/goals/1'), () => null)
 handlers.set(key('DELETE', '/goals/2'), () => null)
 handlers.set(key('DELETE', '/goals/3'), () => null)
 
+// Subscriptions (recurring-charge detection). One of each status so the demo
+// shows the full range: a stable one, a price rise, and an overdue charge.
+handlers.set(key('GET', '/subscriptions'), () => ({
+  totalMonthlyCost: 47.88,
+  currency: 'EUR',
+  subscriptions: [
+    {
+      merchant: 'PRLV SEPA NETFLIX COM',
+      category: null,
+      nativeCurrency: 'EUR',
+      cadence: 'MONTHLY',
+      lastAmount: 12.99,
+      previousAmount: 12.99,
+      averageAmount: 12.99,
+      lastDate: '2026-07-05',
+      nextExpectedDate: '2026-08-05',
+      status: 'ACTIVE',
+      occurrences: 6,
+      accountId: 4,
+      accountName: 'Compte Courant BNP',
+    },
+    {
+      merchant: 'SALLE DE SPORT FITNESS PARK',
+      category: null,
+      nativeCurrency: 'EUR',
+      cadence: 'MONTHLY',
+      lastAmount: 34.89,
+      previousAmount: 29.90,
+      averageAmount: 31.15,
+      lastDate: '2026-07-10',
+      nextExpectedDate: '2026-08-10',
+      status: 'PRICE_INCREASED',
+      occurrences: 5,
+      accountId: 5,
+      accountName: 'Compte Courant BoursoBank',
+    },
+    {
+      merchant: 'ASSURANCE HABITATION MAAF',
+      category: null,
+      nativeCurrency: 'EUR',
+      cadence: 'MONTHLY',
+      lastAmount: 18.50,
+      previousAmount: 18.50,
+      averageAmount: 18.50,
+      lastDate: '2026-04-02',
+      nextExpectedDate: '2026-05-02',
+      status: 'OVERDUE',
+      occurrences: 4,
+      accountId: 4,
+      accountName: 'Compte Courant BNP',
+    },
+  ],
+}))
+
 // Sync
 handlers.set(key('GET', '/sync/status'), () => mockRequisitions)
 handlers.set(key('GET', '/sync/institutions'), () => [

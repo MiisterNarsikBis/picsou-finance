@@ -37,6 +37,8 @@
     "accounts.desc": "Soldes & transactions",
     "goals": "Objectifs",
     "goals.desc": "Suivi de vos épargnes",
+    "subscriptions": "Abonnements",
+    "subscriptions.desc": "Suivi de vos abonnements récurrents",
     "sync": "Synchronisation",
     "settings": "Paramètres",
     "settings.desc": "Préférences & compte",
@@ -386,6 +388,26 @@
     "linkedAccounts": "Comptes liés",
     "history": "Historique",
     "atCurrentPace": "Au rythme actuel"
+  },
+  "subscriptions": {
+    "title": "Abonnements",
+    "totalMonthlyCost": "Coût mensuel estimé",
+    "detectedCount": "{{count}} abonnements détectés",
+    "noSubscriptions": "Aucun abonnement détecté",
+    "noSubscriptionsDescription": "Dès que des prélèvements réguliers apparaîtront dans vos comptes, ils seront listés ici.",
+    "cadenceLabel": "Fréquence",
+    "cadence": {
+      "weekly": "Hebdomadaire",
+      "monthly": "Mensuel",
+      "yearly": "Annuel"
+    },
+    "nextExpected": "Prochain prélèvement estimé",
+    "account": "Compte",
+    "status": {
+      "active": "Actif",
+      "priceIncreased": "Hausse de prix",
+      "overdue": "Non débité récemment"
+    }
   },
   "addAccount": {
     "title": "Ajouter un compte",

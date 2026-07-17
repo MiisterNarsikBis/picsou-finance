@@ -37,6 +37,8 @@
     "accounts.desc": "Balances & transactions",
     "goals": "Goals",
     "goals.desc": "Track your savings",
+    "subscriptions": "Subscriptions",
+    "subscriptions.desc": "Track your recurring subscriptions",
     "sync": "Sync",
     "settings": "Settings",
     "settings.desc": "Preferences & account",
@@ -386,6 +388,26 @@
     "linkedAccounts": "Linked accounts",
     "history": "History",
     "atCurrentPace": "At current pace"
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "totalMonthlyCost": "Estimated monthly cost",
+    "detectedCount": "{{count}} subscriptions detected",
+    "noSubscriptions": "No subscription detected",
+    "noSubscriptionsDescription": "Once regular charges show up in your accounts, they'll be listed here.",
+    "cadenceLabel": "Frequency",
+    "cadence": {
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "yearly": "Yearly"
+    },
+    "nextExpected": "Next expected charge",
+    "account": "Account",
+    "status": {
+      "active": "Active",
+      "priceIncreased": "Price increased",
+      "overdue": "Not charged recently"
+    }
   },
   "addAccount": {
     "title": "Add account",

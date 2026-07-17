@@ -1,5 +1,6 @@
 package com.picsou.repository;
 
+import com.picsou.model.AccountType;
 import com.picsou.model.Transaction;
 import com.picsou.model.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,4 +32,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     /** Earliest transaction date across all accounts */
     @Query("SELECT MIN(t.date) FROM Transaction t")
     LocalDate findEarliestDate();
+
+    /** Outgoing (negative-amount) transactions on the member's cash accounts, oldest first — the
+     * candidate pool for recurring-subscription detection ({@code RecurringSubscriptionService}). */
+    @Query("SELECT t FROM Transaction t "
+        + "WHERE t.account.member.id = :memberId "
+        + "AND t.account.type IN :cashTypes "
+        + "AND t.amount < 0 "
+        + "ORDER BY t.date ASC")
+    List<Transaction> findOutgoingCashTransactionsByMemberId(
+        @Param("memberId") Long memberId, @Param("cashTypes") List<AccountType> cashTypes);
 }

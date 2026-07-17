@@ -37,6 +37,8 @@
     "accounts.desc": "Saldos y transacciones",
     "goals": "Objetivos",
     "goals.desc": "Sigue tu ahorro",
+    "subscriptions": "Suscripciones",
+    "subscriptions.desc": "Sigue tus suscripciones recurrentes",
     "sync": "Sincronización",
     "settings": "Ajustes",
     "settings.desc": "Preferencias y cuenta",
@@ -379,6 +381,26 @@
     "linkedAccounts": "Cuentas vinculadas",
     "history": "Historial",
     "atCurrentPace": "Al ritmo actual"
+  },
+  "subscriptions": {
+    "title": "Suscripciones",
+    "totalMonthlyCost": "Coste mensual estimado",
+    "detectedCount": "{{count}} suscripciones detectadas",
+    "noSubscriptions": "No se ha detectado ninguna suscripción",
+    "noSubscriptionsDescription": "En cuanto aparezcan cargos recurrentes en tus cuentas, se mostrarán aquí.",
+    "cadenceLabel": "Frecuencia",
+    "cadence": {
+      "weekly": "Semanal",
+      "monthly": "Mensual",
+      "yearly": "Anual"
+    },
+    "nextExpected": "Próximo cargo estimado",
+    "account": "Cuenta",
+    "status": {
+      "active": "Activa",
+      "priceIncreased": "Subida de precio",
+      "overdue": "Sin cargos recientes"
+    }
   },
   "addAccount": {
     "title": "Añadir cuenta",
