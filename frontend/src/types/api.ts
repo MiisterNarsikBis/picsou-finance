@@ -447,3 +447,27 @@ export interface RealizedPnlResponse {
   byTicker: TickerRealized[]
   lots: RealizedLot[]
 }
+
+// --- Recurring subscriptions (detected on the fly) ---
+
+export interface Subscription {
+  merchant: string
+  category: string | null
+  nativeCurrency: string
+  cadence: 'WEEKLY' | 'MONTHLY' | 'YEARLY'
+  lastAmount: number
+  previousAmount: number
+  averageAmount: number
+  lastDate: string
+  nextExpectedDate: string
+  status: 'ACTIVE' | 'PRICE_INCREASED' | 'OVERDUE'
+  occurrences: number
+  accountId: number
+  accountName: string
+}
+
+export interface SubscriptionsSummary {
+  totalMonthlyCost: number
+  currency: string
+  subscriptions: Subscription[]
+}

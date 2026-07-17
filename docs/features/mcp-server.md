@@ -107,7 +107,7 @@ Every tool acts only on the key owner's own data; writes are restricted to **man
 | Scope | Tools |
 |-------|-------|
 | `accounts:read` | `list_accounts`, `get_account`, `get_account_holdings`, `get_account_balance_history` |
-| `transactions:read` | `list_account_transactions` |
+| `transactions:read` | `list_account_transactions`, `get_subscriptions` |
 | `goals:read` | `list_goals`, `get_goal`, `get_goal_monthly_entries` |
 | `dashboard:read` | `get_dashboard`, `get_net_worth_history`, `get_profit_and_loss` |
 | `family:read` | `get_family_dashboard` |

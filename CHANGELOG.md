@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   certificates from `frontend/.local/certs/` when present and otherwise falls
   back to a generated self-signed certificate. Local Enable Banking callbacks
   and Playwright URL examples now default to `https://localhost:5173`.
+- **Recurring subscription detection**, computed on the fly from a member's
+  outgoing cash transactions: merchant, cadence (weekly/monthly/yearly),
+  estimated total monthly cost, and a status flag for a recent price increase
+  or a charge that appears overdue. New `/subscriptions` page and `GET
+  /api/subscriptions` endpoint; exposed to MCP clients as `get_subscriptions`
+  under the existing `transactions:read` scope.
 - **CSV transaction import for investment accounts (PEA/CTO)** and **realized
   P&L on closed positions**, computed on the fly with the average-cost method
   (#38, #43).

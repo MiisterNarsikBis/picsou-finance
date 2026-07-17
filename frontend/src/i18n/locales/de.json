@@ -37,6 +37,8 @@
     "accounts.desc": "Salden & Transaktionen",
     "goals": "Ziele",
     "goals.desc": "Verfolge deine Sparziele",
+    "subscriptions": "Abonnements",
+    "subscriptions.desc": "Verfolge deine wiederkehrenden Abonnements",
     "sync": "Sync",
     "settings": "Einstellungen",
     "settings.desc": "Präferenzen & Konto",
@@ -379,6 +381,26 @@
     "linkedAccounts": "Verknüpfte Konten",
     "history": "Verlauf",
     "atCurrentPace": "Beim aktuellen Tempo"
+  },
+  "subscriptions": {
+    "title": "Abonnements",
+    "totalMonthlyCost": "Geschätzte monatliche Kosten",
+    "detectedCount": "{{count}} Abonnements erkannt",
+    "noSubscriptions": "Kein Abonnement erkannt",
+    "noSubscriptionsDescription": "Sobald regelmäßige Abbuchungen auf deinen Konten erscheinen, werden sie hier aufgelistet.",
+    "cadenceLabel": "Häufigkeit",
+    "cadence": {
+      "weekly": "Wöchentlich",
+      "monthly": "Monatlich",
+      "yearly": "Jährlich"
+    },
+    "nextExpected": "Nächste erwartete Abbuchung",
+    "account": "Konto",
+    "status": {
+      "active": "Aktiv",
+      "priceIncreased": "Preiserhöhung",
+      "overdue": "Länger nicht abgebucht"
+    }
   },
   "addAccount": {
     "title": "Konto hinzufügen",

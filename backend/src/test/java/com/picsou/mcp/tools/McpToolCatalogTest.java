@@ -12,6 +12,7 @@ import com.picsou.service.GoalService;
 import com.picsou.service.HistoryService;
 import com.picsou.service.ManualTransactionService;
 import com.picsou.service.PriceService;
+import com.picsou.service.RecurringSubscriptionService;
 import com.picsou.service.SyncService;
 import com.picsou.service.TradeRepublicSyncService;
 import com.picsou.service.UserContext;
@@ -48,7 +49,8 @@ class McpToolCatalogTest {
         "create_manual_account", "update_account", "delete_account", "add_balance_snapshot",
         "upsert_holding", "delete_holding",
         // transactions:read / transactions:write
-        "list_account_transactions", "add_transaction", "update_transaction", "delete_transaction",
+        "list_account_transactions", "get_subscriptions", "add_transaction", "update_transaction",
+        "delete_transaction",
         // goals:read / goals:write
         "list_goals", "get_goal", "get_goal_monthly_entries", "create_goal", "update_goal",
         "delete_goal", "set_goal_month_contribution",
@@ -65,7 +67,8 @@ class McpToolCatalogTest {
     private ToolCallbackProvider buildProvider() {
         AccountTools account = new AccountTools(mock(AccountService.class), mock(UserContext.class));
         TransactionTools tx = new TransactionTools(
-            mock(AccountService.class), mock(ManualTransactionService.class), mock(UserContext.class));
+            mock(AccountService.class), mock(ManualTransactionService.class),
+            mock(RecurringSubscriptionService.class), mock(UserContext.class));
         GoalTools goal = new GoalTools(mock(GoalService.class), mock(UserContext.class));
         InsightTools insight = new InsightTools(
             mock(DashboardService.class), mock(HistoryService.class), mock(PriceService.class),
