@@ -1,74 +1,78 @@
 # claude_features.md
 
-Idées de fonctionnalités pour Picsou — pistes à explorer, pas un engagement de roadmap. Chaque
-idée indique pourquoi elle serait utile et comment elle s'appuierait sur l'architecture existante
-(voir [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/INDEX.md`](docs/INDEX.md) pour
-l'existant avant de démarrer une de ces pistes — certaines touchent des zones déjà couvertes par
-une ADR).
+Idées de fonctionnalités pour Picsou — pistes à explorer, pas un engagement de roadmap. Avant de
+lancer l'une d'elles : vérifier [`docs/INDEX.md`](docs/INDEX.md) / [`docs/decisions/`](docs/decisions/)
+pour l'existant (certaines zones sont déjà couvertes par une ADR), et suivre le workflow "New
+feature" de `CLAUDE.md` (note de feature + ADR si le choix est structurant).
 
-## 1. Budgets par catégorie avec alertes de dépassement
+## Budget & suivi du quotidien
 
-Aujourd'hui Picsou suit les objectifs d'épargne (`goals`) et le patrimoine, mais pas un budget
-mensuel par poste de dépense (courses, transport, loisirs...). Ajouter des enveloppes budgétaires
-par catégorie, avec une alerte quand une catégorie dépasse son plafond en cours de mois.
-S'appuierait sur les transactions déjà importées/synchronisées (bancaires + manuelles) et sur le
-`SchedulerService` existant pour le calcul périodique.
+1. **Budgets par catégorie avec alertes de dépassement** — enveloppes budgétaires mensuelles par
+   poste de dépense (courses, transport, loisirs...), calculées sur les transactions déjà
+   synchronisées, avec alerte au dépassement du plafond.
+2. **Détection des abonnements récurrents** — repérer automatiquement les prélèvements récurrents
+   (streaming, salle de sport, assurances), afficher leur coût total mensuel, alerter en cas de
+   hausse de prix ou d'abonnement "oublié".
+3. **Prévision de trésorerie (cash-flow prévisionnel)** — projeter le solde des comptes courants
+   sur les 30 prochains jours à partir des prélèvements récurrents et échéances connues (loyer,
+   prêt, salaire), pour anticiper un découvert.
+4. **Auto-catégorisation apprenante des transactions** — affiner la catégorisation automatique à
+   partir des corrections manuelles de l'utilisateur au lieu de règles figées.
+5. **Tags et recherche avancée sur les transactions** — étiquettes libres en plus des catégories
+   (ex. "vacances 2026", "travaux"), recherche plein texte et filtres combinés.
 
-## 2. Détection des abonnements récurrents
+## Notifications & assistant
 
-Repérer automatiquement les prélèvements récurrents (Netflix, salle de sport, assurances...) à
-partir de l'historique de transactions, afficher le coût total mensuel des abonnements, et alerter
-en cas de hausse de prix ou d'abonnement "oublié" (aucune activité associée). Un des cas d'usage
-les plus demandés sur ce type d'app — et une bonne matière pour l'assistant IA (idée 4).
+6. **Notifications et alertes proactives** — canal email/push pour solde sous un seuil, échéance
+   de prêt proche, objectif en retard sur sa trajectoire, variation significative d'un actif
+   suivi. Aujourd'hui tout est "pull" (rien n'est poussé vers l'utilisateur).
+7. **Assistant financier conversationnel intégré** — page de chat interne branchée sur les mêmes
+   outils `@Tool` member-scopés que le serveur MCP déjà embarqué
+   ([`docs/features/mcp-server.md`](docs/features/mcp-server.md)), pour poser des questions en
+   langage naturel sans app tierce.
+8. **Alertes de sécurité du compte** — notification à l'utilisateur en cas de connexion depuis un
+   nouvel appareil/pays, ou de changement de mot de passe/2FA — complément naturel au TOTP déjà en
+   place.
 
-## 3. Notifications et alertes proactives
+## Famille & partage
 
-Un canal de notifications (email, ou push si une PWA voit le jour) pour : solde sous un seuil,
-échéance de prêt qui approche, objectif d'épargne en retard sur sa trajectoire, variation
-significative d'un actif crypto/bourse suivi. Actuellement rien n'est poussé vers l'utilisateur en
-dehors du dashboard — tout est "pull". Nécessite un service d'envoi (SMTP déjà probablement présent
-pour d'autres flux à vérifier) et des préférences par membre.
+9. **Répartition des dépenses communes entre membres du foyer** — marquer une dépense comme
+   partagée, définir une clé de répartition, calculer le solde "qui doit combien à qui" (type
+   Tricount), en s'appuyant sur le système multi-membre déjà existant.
+10. **Cagnottes / objectifs collaboratifs multi-contributeurs** — étendre les `goals` existants
+    pour visualiser la contribution de chaque membre à un objectif commun (achat immobilier,
+    voyage), pas seulement le total.
+11. **Accès en lecture seule pour un tiers de confiance** — partage temporaire et révocable d'une
+    vue en lecture seule à un conseiller financier ou un comptable, sans lui donner un compte
+    membre complet.
 
-## 4. Assistant financier conversationnel intégré
+## Reporting & analyse
 
-Picsou expose déjà un serveur MCP embarqué avec des clés d'accès scopées par membre
-(voir [`docs/features/mcp-server.md`](docs/features/mcp-server.md)) pensé pour des clients MCP
-externes (Claude Desktop, etc.). Une page de chat interne au produit, branchée sur ces mêmes
-outils `@Tool` déjà member-scopés, permettrait de poser des questions en langage naturel
-("combien j'ai dépensé en restaurants ce mois-ci ?") sans dépendre d'une app tierce. Gros levier
-produit, risque architectural faible car la couche outils existe déjà.
+12. **Rapport patrimonial mensuel automatique** — digest de fin de mois (évolution du net worth,
+    comparaison au mois précédent, top variations, progression des objectifs), généré à partir des
+    `BalanceSnapshot` déjà calculés quotidiennement.
+13. **Score de santé financière** — indicateur synthétique (taux d'épargne, diversification, niveau
+    d'endettement, régularité) affiché sur le dashboard.
+14. **Détection d'anomalies de dépenses** — repérer un doublon de prélèvement, une fraude ou un
+    montant atypique par rapport à l'historique du marchand/de la catégorie.
+15. **Comparateur de performance vs indices de référence** — comparer la performance d'un
+    portefeuille d'ETF/actions à un benchmark (CW8, S&P 500...) sur la même période.
+16. **Comparateur de rendement de l'épargne** — visualiser en un coup d'œil quel compte
+    (livret, PEA, assurance-vie...) rapporte le mieux et suggérer où placer un excédent de
+    trésorerie.
 
-## 5. Répartition des dépenses communes entre membres du foyer
+## Fiscalité & projection
 
-Le multi-membre existe (`family_member`, `sharing_settings`), mais pour un couple/famille qui
-partage certains comptes, il manque un mécanisme de "qui doit combien à qui" sur les dépenses
-communes (type Tricount) — marquer une dépense comme partagée, définir une clé de répartition, et
-calculer un solde entre membres.
+17. **Simulateur de projection patrimoniale / indépendance financière** — projection "et si..." à
+    ce rythme d'épargne (FIRE, achat immobilier, retraite anticipée), en s'appuyant sur les mêmes
+    données que l'amortissement de prêt déjà calculé à la volée.
+18. **Simulateur fiscal** — estimation de l'impôt sur les plus-values (flat tax) ou de l'IFI à
+    partir des positions et ventes déjà suivies, pour anticiper avant la déclaration.
 
-## 6. Rapport patrimonial mensuel automatique
+## Import & accès
 
-Un digest généré et envoyé (email ou consultable dans l'app) en fin de mois : évolution du
-patrimoine net, comparaison au mois précédent, top variations, progression des objectifs. Combine
-les snapshots de solde déjà calculés quotidiennement (`BalanceSnapshot`) avec un job planifié
-supplémentaire dans `SchedulerService`.
-
-## 7. Simulateur de projection patrimoniale / indépendance financière
-
-Un outil de simulation "et si..." : à ce rythme d'épargne, quand est-ce que je peux couvrir mes
-dépenses avec le patrimoine investi (FIRE), ou combien coûterait un projet (achat immobilier,
-retraite anticipée) compte tenu des flux actuels. S'appuierait sur les mêmes données que
-l'amortissement de prêt déjà calculé à la volée
-([`docs/decisions/2026-04-26-loan-amortization-on-the-fly.md`](docs/decisions/2026-04-26-loan-amortization-on-the-fly.md)).
-
-## 8. Score de santé financière et détection d'anomalies
-
-Un score synthétique (taux d'épargne, diversification, niveau d'endettement, régularité) affiché
-sur le dashboard, plus une détection de transactions inhabituelles (montant ou marchand atypique)
-pour repérer un doublon de prélèvement, une fraude, ou une dépense oubliée. Peut démarrer simple
-(règles statistiques sur l'historique) avant d'envisager un vrai modèle.
-
----
-
-Avant de lancer l'une de ces pistes : vérifier `docs/decisions/` pour une ADR déjà existante sur
-le sujet, et suivre le workflow "New feature" de `CLAUDE.md` (note de feature + ADR si le choix est
-structurant).
+19. **Import de relevés bancaires par PDF/OCR** — pour les banques non couvertes par les
+    connecteurs existants (Enable Banking, Powens), extraire les transactions d'un relevé PDF
+    importé manuellement.
+20. **Application mobile / PWA installable** — installation sur mobile avec notifications push,
+    en s'appuyant sur le frontend React existant plutôt qu'une app native séparée.
