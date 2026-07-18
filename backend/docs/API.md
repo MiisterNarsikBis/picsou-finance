@@ -917,6 +917,8 @@ Returns whether the Finary API credentials (`FINARY_EMAIL`, `FINARY_PASSWORD`) a
 }
 ```
 
+**Response `200` — `FinaryImportResultResponse`** (same shape as file-based import).
+
 ---
 
 ### 11. Subscriptions — `/api/subscriptions`
@@ -957,5 +959,3 @@ Nothing is persisted — recomputed on every call.
 `cadence` is one of `WEEKLY`, `MONTHLY`, `YEARLY`. `status` is one of `ACTIVE`, `PRICE_INCREASED`
 (last charge more than 5% above the previous one), `OVERDUE` (no charge seen well past the next
 expected date — takes precedence over `PRICE_INCREASED` when both would apply).
-
-**Response `200` — `FinaryImportResultResponse`** (same shape as file-based import).

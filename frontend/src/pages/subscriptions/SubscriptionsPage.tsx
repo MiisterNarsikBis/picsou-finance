@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useSubscriptions } from '@/features/subscriptions/hooks'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorState } from '@/components/shared/ErrorState'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { CurrencyDisplay } from '@/components/shared/CurrencyDisplay'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -8,13 +9,15 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { RefreshCcw, TrendingUp, AlertTriangle } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { formatApiError } from '@/lib/errors'
 import type { Subscription } from '@/types/api'
 
 export function SubscriptionsPage() {
   const { t } = useTranslation()
-  const { data, isLoading } = useSubscriptions()
+  const { data, isLoading, error } = useSubscriptions()
 
   if (isLoading) return <LoadingSkeleton />
+  if (error) return <ErrorState message={formatApiError(error, t)} />
 
   const subscriptions = data?.subscriptions ?? []
 

@@ -78,10 +78,12 @@ nothing is persisted, every call recomputes from the transaction stream.
 
 ## Tests
 
-- `RecurringSubscriptionServiceTest` — 8 unit tests: stable monthly charge (`ACTIVE`), price rise
+- `RecurringSubscriptionServiceTest` — 11 unit tests: stable monthly charge (`ACTIVE`), price rise
   above threshold (`PRICE_INCREASED`), missed expected charge (`OVERDUE`), fewer than 3 occurrences
-  (not detected), irregular intervals (not detected), weekly cadence + monthly-equivalent
-  conversion, cross-currency exclusion from the total, and merchant-normalization folding.
+  (not detected), irregular intervals (not detected), weekly and yearly cadence + monthly-equivalent
+  conversion, cadence classification boundaries (4/5/9/10/24/25/35/36/349/350/380/381 days),
+  `OVERDUE` taking precedence over `PRICE_INCREASED` when both conditions hold, cross-currency
+  exclusion from the total, and merchant-normalization folding.
 - `McpToolCatalogTest` — updated to pin `get_subscriptions` in the curated MCP tool allowlist.
 
 ## Links

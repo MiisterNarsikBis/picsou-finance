@@ -176,4 +176,55 @@ class RecurringSubscriptionServiceTest {
             .isEqualTo(RecurringSubscriptionService.normalizeMerchant("PRLV SEPA NETFLIX.COM 5512890 15/02"));
         assertThat(RecurringSubscriptionService.normalizeMerchant(null)).isEmpty();
     }
+
+    @Test
+    void yearlyCadence_isDetectedAndConvertedToMonthlyEquivalent() {
+        LocalDate now = LocalDate.now();
+        stub(List.of(
+            tx(now.minusYears(3), "ASSURANCE AUTO ANNUELLE", "-365.00"),
+            tx(now.minusYears(2), "ASSURANCE AUTO ANNUELLE", "-365.00"),
+            tx(now.minusYears(1), "ASSURANCE AUTO ANNUELLE", "-365.00"),
+            tx(now, "ASSURANCE AUTO ANNUELLE", "-365.00")
+        ));
+
+        SubscriptionsResponse response = service.detect(MEMBER_ID);
+        Subscription sub = response.subscriptions().get(0);
+
+        assertThat(sub.cadence()).isEqualTo(Cadence.YEARLY);
+        assertThat(sub.status()).isEqualTo(Status.ACTIVE);
+        // 365.00 / 12 = 30.42
+        assertThat(response.totalMonthlyCost()).isEqualByComparingTo("30.42");
+    }
+
+    @Test
+    void classifyCadence_boundaries() {
+        assertThat(RecurringSubscriptionService.classifyCadence(4)).isNull();
+        assertThat(RecurringSubscriptionService.classifyCadence(5)).isEqualTo(Cadence.WEEKLY);
+        assertThat(RecurringSubscriptionService.classifyCadence(9)).isEqualTo(Cadence.WEEKLY);
+        assertThat(RecurringSubscriptionService.classifyCadence(10)).isNull();
+        assertThat(RecurringSubscriptionService.classifyCadence(24)).isNull();
+        assertThat(RecurringSubscriptionService.classifyCadence(25)).isEqualTo(Cadence.MONTHLY);
+        assertThat(RecurringSubscriptionService.classifyCadence(35)).isEqualTo(Cadence.MONTHLY);
+        assertThat(RecurringSubscriptionService.classifyCadence(36)).isNull();
+        assertThat(RecurringSubscriptionService.classifyCadence(349)).isNull();
+        assertThat(RecurringSubscriptionService.classifyCadence(350)).isEqualTo(Cadence.YEARLY);
+        assertThat(RecurringSubscriptionService.classifyCadence(380)).isEqualTo(Cadence.YEARLY);
+        assertThat(RecurringSubscriptionService.classifyCadence(381)).isNull();
+    }
+
+    @Test
+    void whenBothOverdueAndPriceIncreaseConditionsHold_overdueTakesPrecedence() {
+        LocalDate now = LocalDate.now();
+        stub(List.of(
+            // Monthly cadence, but the last charge is ~4 months old (well past the ~1.5-cadence
+            // OVERDUE threshold) AND more than 5% above the previous one — both conditions hold.
+            tx(now.minusMonths(6), "SALLE DE SPORT XYZ", "-29.90"),
+            tx(now.minusMonths(5), "SALLE DE SPORT XYZ", "-29.90"),
+            tx(now.minusMonths(4), "SALLE DE SPORT XYZ", "-34.90")
+        ));
+
+        Subscription sub = service.detect(MEMBER_ID).subscriptions().get(0);
+
+        assertThat(sub.status()).isEqualTo(Status.OVERDUE);
+    }
 }

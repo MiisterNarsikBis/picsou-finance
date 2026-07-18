@@ -37,8 +37,8 @@ import java.util.stream.Collectors;
  * punctuation stripped, so reference numbers and dates don't fragment the group), then a group is
  * called "recurring" when it has at least {@link #MIN_OCCURRENCES} charges spaced at a regular
  * weekly/monthly/yearly cadence (interval to the median tolerated within
- * {@link #INTERVAL_TOLERANCE_RATIO}, at most one outlier). A price rise of more than
- * {@link #PRICE_INCREASE_THRESHOLD} between the two most recent charges is flagged
+ * {@link #INTERVAL_TOLERANCE_RATIO}, at most one outlier). A price rise of more than 5% (the
+ * {@link #PRICE_INCREASE_THRESHOLD} multiplier) between the two most recent charges is flagged
  * {@code PRICE_INCREASED}; a next-expected-charge date missed by more than half a cadence is
  * flagged {@code OVERDUE}.
  */
@@ -140,7 +140,7 @@ public class RecurringSubscriptionService {
             txs.size(), account.getId(), account.getName()));
     }
 
-    private static Cadence classifyCadence(long medianDays) {
+    static Cadence classifyCadence(long medianDays) {
         if (medianDays >= 5 && medianDays <= 9) return Cadence.WEEKLY;
         if (medianDays >= 25 && medianDays <= 35) return Cadence.MONTHLY;
         if (medianDays >= 350 && medianDays <= 380) return Cadence.YEARLY;
