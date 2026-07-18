@@ -9,6 +9,8 @@ import com.picsou.model.AccountType;
 import com.picsou.model.Transaction;
 import com.picsou.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RecurringSubscriptionService {
 
+    private static final Logger log = LoggerFactory.getLogger(RecurringSubscriptionService.class);
+
     private static final List<AccountType> CASH_TYPES =
         List.of(AccountType.CHECKING, AccountType.SAVINGS, AccountType.LEP, AccountType.OTHER);
 
@@ -67,6 +71,8 @@ public class RecurringSubscriptionService {
         List<Subscription> subscriptions = new ArrayList<>();
         for (Map.Entry<String, List<Transaction>> entry : byMerchant.entrySet()) {
             if (entry.getKey().isBlank()) {
+                log.debug("Skipping {} transaction(s) with a blank normalized merchant key "
+                    + "(description was null, empty, or only digits/punctuation)", entry.getValue().size());
                 continue;
             }
             List<Transaction> txs = new ArrayList<>(entry.getValue());

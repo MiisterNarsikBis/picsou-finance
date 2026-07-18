@@ -21,6 +21,14 @@ public record SubscriptionsResponse(
     String currency,
     List<Subscription> subscriptions
 ) {
+    /**
+     * {@code lastAmount}/{@code previousAmount}/{@code averageAmount} are absolute magnitudes
+     * (always &ge; 0), unlike {@code Transaction.amount} which is signed negative for an outflow —
+     * every transaction behind a detected subscription is an outflow by construction (see
+     * {@code TransactionRepository.findOutgoingCashTransactionsByMemberId}), so the sign carries no
+     * information here and is dropped for a simpler API. {@code occurrences} is the number of
+     * transactions the group was detected from (at least {@code RecurringSubscriptionService.MIN_OCCURRENCES}).
+     */
     public record Subscription(
         String merchant,
         String category,
