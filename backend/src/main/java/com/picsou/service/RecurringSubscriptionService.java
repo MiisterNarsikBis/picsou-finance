@@ -104,6 +104,8 @@ public class RecurringSubscriptionService {
         long medianInterval = median(intervals);
         Cadence cadence = classifyCadence(medianInterval);
         if (cadence == null) {
+            log.debug("Skipping merchant \"{}\": median interval of {} day(s) matches no supported "
+                + "cadence (weekly/monthly/yearly)", merchant, medianInterval);
             return Optional.empty();
         }
 
@@ -171,7 +173,10 @@ public class RecurringSubscriptionService {
             .entrySet().stream()
             .max(Map.Entry.comparingByValue())
             .map(Map.Entry::getKey)
-            .orElse("EUR");
+            .orElseGet(() -> {
+                log.debug("No outgoing cash transactions found; defaulting dominant currency to EUR");
+                return "EUR";
+            });
     }
 
     /** Strips digits and punctuation so reference numbers/dates embedded in a bank description
