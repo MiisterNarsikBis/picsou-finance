@@ -400,7 +400,7 @@
     "desc": {
       "banks": "Connect your banks via OAuth",
       "exchanges": "Binance, Kraken...",
-      "wallets": "Bitcoin, Ethereum, Solana...",
+      "wallets": "Bitcoin, Ethereum, BNB, Solana...",
       "tr": "Trade Republic",
       "finary": "Import from Finary",
       "manual": "Create an account manually"
@@ -473,11 +473,14 @@
       "label": "Label",
       "track": "Track",
       "connectError": "Failed to add wallet. Check the address and try again.",
+      "syncError": "Sync failed. Check the address or try again later.",
+      "removeError": "Could not remove this wallet. Please try again.",
       "sync": "Synchronize",
       "remove": "Remove",
       "removeConfirm": "Remove this wallet?",
       "noWallets": "No wallets tracked",
-      "lastSync": "Last sync"
+      "lastSync": "Last sync",
+      "evmHint": "One address, all EVM chains — Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base and Avalanche."
     },
     "finary": {
       "title": "Finary",

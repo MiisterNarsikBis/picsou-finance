@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **BNB Chain support and EVM multichain wallets.** On-chain wallets gained an
+  `EVM` chain that tracks a single `0x` address across every enabled EVM network
+  — Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base and Avalanche —
+  reporting each native coin (ETH, BNB, POL, AVAX…) plus curated ERC-20/BEP-20
+  stablecoins, all over keyless public RPCs (no API key). Balances aggregate by
+  symbol across chains. Existing Ethereum wallets are migrated to `EVM`
+  automatically, keeping their history — including their display name, which is
+  relabelled from "ETHEREUM Wallet" to "EVM Wallet" (custom labels untouched). See
+  [ADR](docs/decisions/2026-07-17-evm-multichain-wallets.md).
 - **HTTPS frontend development mode.** Vite uses trusted local `mkcert`
   certificates from `frontend/.local/certs/` when present and otherwise falls
   back to a generated self-signed certificate. Local Enable Banking callbacks
@@ -38,6 +47,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Wallet sync and removal failures now say why.** Both buttons reported nothing
+  at all when they failed — the row simply re-enabled, and the delete dialog sat
+  there — so a `422` from an RPC outage was indistinguishable from success. The
+  reason is now shown against the wallet that failed, and inside the delete
+  dialog, matching the add-wallet form.
+- **A bad price response can no longer cost a day of history.** The daily
+  snapshot job is transactional and looped over every account without a guard, so
+  one malformed CoinGecko reply would have aborted the remaining accounts and
+  members *and* rolled back the snapshots already taken. Each account, member and
+  backfilled ticker is now guarded individually. Relatedly, a genuine bug in the
+  price adapter is no longer swallowed as "no prices available" — only real
+  upstream outages are.
+- **A price-provider outage can no longer zero a wallet's balance.** If no asset
+  in a wallet could be priced, the sync recorded a 0 EUR balance and stamped a 0
+  snapshot for that day — flattening the net-worth chart for what was a transient
+  outage, and doing it quietly because the holdings themselves were preserved.
+  That sync now fails instead, leaving the previous balance intact. A partial
+  outage still records a partial total.
+- **One bad price no longer blanks the intraday chart.** A failure fetching
+  intraday prices for a single ticker returned a server error for the whole
+  chart; that ticker is now omitted and the rest still renders.
+- **Invalid wallet addresses fail fast with a clear error.** Adding a wallet with
+  a malformed address — or no address or chain at all — reported a `422` "could
+  not sync, please try again later", inviting a retry of input that can never
+  succeed, after a pointless call to the chain's RPC. The format is now checked
+  up front and comes back as a `400` naming what was expected — and the crypto
+  wallet form actually displays it, where it previously swallowed add failures
+  and simply appeared to do nothing.
+- **CoinGecko outages are diagnosable.** A failed price fetch returned an empty
+  map indistinguishable from "nothing to price", logged as one opaque line.
+  Failures are now classified — rate-limit, server error with status and body,
+  timeout with its duration, or an unexpected error with its stacktrace — and
+  always name the tickers involved. Prices still degrade to "unvalued this
+  cycle" rather than failing the sync, which is what keeps a price blip from
+  touching holdings or their cost basis.
 - **Ethereum wallet balances sync again.** The hard-coded `cloudflare-eth.com`
   RPC was deprecated and started returning an HTTP 200 JSON-RPC error for
   `eth_getBalance`, which the adapter read as a 0 balance — wallets appeared to
