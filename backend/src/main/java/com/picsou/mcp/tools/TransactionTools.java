@@ -10,6 +10,8 @@ import com.picsou.service.AccountService;
 import com.picsou.service.ManualTransactionService;
 import com.picsou.service.RecurringSubscriptionService;
 import com.picsou.service.UserContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -28,6 +30,8 @@ import java.util.List;
  */
 @Component
 public class TransactionTools {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionTools.class);
 
     private final AccountService accountService;
     private final ManualTransactionService manualTransactionService;
@@ -108,6 +112,15 @@ public class TransactionTools {
             + "estimated total monthly cost.")
     @RequiresScope(Scopes.TRANSACTIONS_READ)
     public SubscriptionsResponse getSubscriptions() {
-        return recurringSubscriptionService.detect(userContext.currentMemberId());
+        Long memberId = userContext.currentMemberId();
+        try {
+            SubscriptionsResponse response = recurringSubscriptionService.detect(memberId);
+            log.info("MCP get_subscriptions: found {} subscription(s) for memberId={}",
+                response.subscriptions().size(), memberId);
+            return response;
+        } catch (RuntimeException e) {
+            log.error("MCP get_subscriptions failed for memberId={}", memberId, e);
+            throw e;
+        }
     }
 }

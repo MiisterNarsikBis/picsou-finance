@@ -1,10 +1,12 @@
 package com.picsou.mcp.tools;
 
+import com.picsou.dto.SubscriptionsResponse;
 import com.picsou.dto.TransactionRequest;
 import com.picsou.dto.TransactionResponse;
 import com.picsou.model.TransactionType;
 import com.picsou.service.AccountService;
 import com.picsou.service.ManualTransactionService;
+import com.picsou.service.RecurringSubscriptionService;
 import com.picsou.service.UserContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,12 +14,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.QueryTimeoutException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -31,6 +35,7 @@ class TransactionToolsTest {
 
     @Mock AccountService accountService;
     @Mock ManualTransactionService manualTransactionService;
+    @Mock RecurringSubscriptionService recurringSubscriptionService;
     @Mock UserContext userContext;
     @InjectMocks TransactionTools tools;
 
@@ -86,5 +91,22 @@ class TransactionToolsTest {
         tools.deleteTransaction(5L, 9L);
 
         verify(manualTransactionService).deleteTransaction(5L, 9L, MID);
+    }
+
+    @Test
+    void getSubscriptions_delegatesScopedToCurrentMember() {
+        SubscriptionsResponse response = new SubscriptionsResponse(BigDecimal.ZERO, "EUR", List.of());
+        when(userContext.currentMemberId()).thenReturn(MID);
+        when(recurringSubscriptionService.detect(MID)).thenReturn(response);
+
+        assertThat(tools.getSubscriptions()).isSameAs(response);
+    }
+
+    @Test
+    void getSubscriptions_propagatesServiceFailure() {
+        when(userContext.currentMemberId()).thenReturn(MID);
+        when(recurringSubscriptionService.detect(MID)).thenThrow(new QueryTimeoutException("DB unreachable"));
+
+        assertThatThrownBy(tools::getSubscriptions).isInstanceOf(QueryTimeoutException.class);
     }
 }

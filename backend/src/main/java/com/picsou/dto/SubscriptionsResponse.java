@@ -3,6 +3,7 @@ package com.picsou.dto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Recurring subscriptions detected on the fly from the member's outgoing cash transactions
@@ -21,6 +22,15 @@ public record SubscriptionsResponse(
     String currency,
     List<Subscription> subscriptions
 ) {
+    public SubscriptionsResponse {
+        Objects.requireNonNull(totalMonthlyCost, "totalMonthlyCost is required");
+        Objects.requireNonNull(currency, "currency is required");
+        Objects.requireNonNull(subscriptions, "subscriptions is required");
+        if (totalMonthlyCost.signum() < 0) {
+            throw new IllegalArgumentException("totalMonthlyCost must be non-negative");
+        }
+    }
+
     /**
      * {@code lastAmount}/{@code previousAmount}/{@code averageAmount} are absolute magnitudes
      * (always &ge; 0), unlike {@code Transaction.amount} which is signed negative for an outflow —

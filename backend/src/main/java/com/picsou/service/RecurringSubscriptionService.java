@@ -11,6 +11,7 @@ import com.picsou.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,8 +62,14 @@ public class RecurringSubscriptionService {
 
     @Transactional(readOnly = true)
     public SubscriptionsResponse detect(Long memberId) {
-        List<Transaction> outgoing =
-            transactionRepository.findOutgoingCashTransactionsByMemberId(memberId, CASH_TYPES);
+        List<Transaction> outgoing;
+        try {
+            outgoing = transactionRepository.findOutgoingCashTransactionsByMemberId(memberId, CASH_TYPES);
+        } catch (DataAccessException e) {
+            log.error("Failed to load outgoing cash transactions for recurring-subscription detection "
+                + "(memberId={})", memberId, e);
+            throw e;
+        }
 
         Map<String, List<Transaction>> byMerchant = outgoing.stream()
             .collect(Collectors.groupingBy(
@@ -136,6 +143,11 @@ public class RecurringSubscriptionService {
         }
 
         Account account = last.getAccount();
+        if (account == null) {
+            log.warn("Transaction {} for merchant \"{}\" has no associated account; skipping",
+                last.getId(), merchant);
+            return Optional.empty();
+        }
         return Optional.of(new Subscription(
             merchant, last.getCategory(), last.getNativeCurrency(), cadence,
             lastAmount, previousAmount, averageAmount, last.getDate(), nextExpected, status,

@@ -13,12 +13,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.QueryTimeoutException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -226,5 +228,27 @@ class RecurringSubscriptionServiceTest {
         Subscription sub = service.detect(MEMBER_ID).subscriptions().get(0);
 
         assertThat(sub.status()).isEqualTo(Status.OVERDUE);
+    }
+
+    @Test
+    void repositoryFailure_propagatesRatherThanBeingSwallowed() {
+        when(transactionRepository.findOutgoingCashTransactionsByMemberId(eq(MEMBER_ID), anyList()))
+            .thenThrow(new QueryTimeoutException("DB unreachable"));
+
+        assertThatThrownBy(() -> service.detect(MEMBER_ID)).isInstanceOf(QueryTimeoutException.class);
+    }
+
+    @Test
+    void transactionWithNoAccount_isSkippedInsteadOfThrowing() {
+        LocalDate now = LocalDate.now();
+        Transaction orphan1 = Transaction.builder().account(null).date(now.minusMonths(2))
+            .description("ORPHAN CHARGE").amount(new BigDecimal("-9.99")).nativeCurrency("EUR").build();
+        Transaction orphan2 = Transaction.builder().account(null).date(now.minusMonths(1))
+            .description("ORPHAN CHARGE").amount(new BigDecimal("-9.99")).nativeCurrency("EUR").build();
+        Transaction orphan3 = Transaction.builder().account(null).date(now)
+            .description("ORPHAN CHARGE").amount(new BigDecimal("-9.99")).nativeCurrency("EUR").build();
+        stub(List.of(orphan1, orphan2, orphan3));
+
+        assertThat(service.detect(MEMBER_ID).subscriptions()).isEmpty();
     }
 }
